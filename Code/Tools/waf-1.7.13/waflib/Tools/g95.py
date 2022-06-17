@@ -37,8 +37,7 @@ def g95_modifier_darwin(conf):
 @conf
 def g95_modifier_platform(conf):
 	dest_os = conf.env['DEST_OS'] or Utils.unversioned_sys_platform()
-	g95_modifier_func = getattr(conf, 'g95_modifier_' + dest_os, None)
-	if g95_modifier_func:
+	if g95_modifier_func := getattr(conf, f'g95_modifier_{dest_os}', None):
 		g95_modifier_func()
 
 @conf
@@ -48,10 +47,7 @@ def get_g95_version(conf, fc):
 	version_re = re.compile(r"g95\s*(?P<major>\d*)\.(?P<minor>\d*)").search
 	cmd = fc + ['--version']
 	out, err = fc_config.getoutput(conf, cmd, stdin=False)
-	if out:
-		match = version_re(out)
-	else:
-		match = version_re(err)
+	match = version_re(out) if out else version_re(err)
 	if not match:
 		conf.fatal('cannot determine g95 version')
 	k = match.groupdict()

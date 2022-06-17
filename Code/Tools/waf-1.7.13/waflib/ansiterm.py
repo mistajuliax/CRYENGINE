@@ -164,10 +164,7 @@ else:
 			windll.kernel32.GetConsoleScreenBufferInfo(self.hconsole, byref(sbinfo))
 			attr = sbinfo.Attributes
 			for c in cols:
-				if is_vista:
-					c = int(c)
-				else:
-					c = to_int(c, 0)
+				c = int(c) if is_vista else to_int(c, 0)
 				if c in range(30,38): # fgcolor
 					attr = (attr & 0xfff0) | self.rgb2bgr(c-30)
 				elif c in range(40,48): # bgcolor
@@ -215,8 +212,7 @@ else:
 				wlock.acquire()
 				for param, cmd, txt in self.ansi_tokens.findall(text):
 					if cmd:
-						cmd_func = self.ansi_command_table.get(cmd)
-						if cmd_func:
+						if cmd_func := self.ansi_command_table.get(cmd):
 							cmd_func(self, param)
 					else:
 						self.writeconsole(txt)

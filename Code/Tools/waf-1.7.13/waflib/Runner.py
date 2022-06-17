@@ -147,9 +147,7 @@ class Parallel(object):
 
 		:rtype: :py:class:`waflib.Task.TaskBase`
 		"""
-		if not self.outstanding:
-			return None
-		return self.outstanding.pop(0)
+		return self.outstanding.pop(0) if self.outstanding else None
 
 	def postpone(self, tsk):
 		"""
@@ -180,15 +178,16 @@ class Parallel(object):
 					pass
 				else:
 					if cond:
-						msg = 'check the build order for the tasks'
-						for tsk in self.frozen:
-							if not tsk.run_after:
-								msg = 'check the methods runnable_status'
-								break
-						lst = []
-						for tsk in self.frozen:
-							lst.append('%s\t-> %r' % (repr(tsk), [id(x) for x in tsk.run_after]))
-						raise Errors.WafError('Deadlock detected: %s%s' % (msg, ''.join(lst)))
+						msg = next(
+						    ('check the methods runnable_status'
+						     for tsk in self.frozen if not tsk.run_after),
+						    'check the build order for the tasks',
+						)
+						lst = [
+						    '%s\t-> %r' % (repr(tsk), [id(x) for x in tsk.run_after])
+						    for tsk in self.frozen
+						]
+						raise Errors.WafError(f"Deadlock detected: {msg}{''.join(lst)}")
 				self.deadlock = self.processed
 
 			if self.frozen:
@@ -288,7 +287,7 @@ class Parallel(object):
 		self.total = self.bld.total()
 		if self.total == 0:
 			self.stop = True
-			
+
 		while not self.stop:
 
 			self.refill_task_list()
@@ -311,7 +310,7 @@ class Parallel(object):
 			if self.stop: # stop immediately after a failure was detected
 				break
 
-			try:				
+			try:		
 				if self.bld.options.file_filter == "":
 					st = tsk.runnable_status()	# No file filter, execute all tasks
 				else: # File filter, check if we should compile this task		
@@ -319,16 +318,10 @@ class Parallel(object):
 					st = Task.SKIP_ME
 					if not hasattr(self, 'required_tasks'):
 						self.required_tasks = []
-						
-					# Check if we need to execute this task
-					bExecuteTask = False
+
 					file_filter_list = self.bld.options.file_filter.split(";")
-					
-					for input in tsk.inputs:			
-						if input.abspath() in file_filter_list:
-							bExecuteTask = True
-							break
-					
+
+					bExecuteTask = any(input.abspath() in file_filter_list for input in tsk.inputs)
 					if tsk in self.required_tasks:
 						bExecuteTask = True
 
@@ -342,7 +335,7 @@ class Parallel(object):
 							for input in tsk.inputs:			
 								if input.abspath() in file_filter_list:
 									st = Task.RUN_ME									
-									
+
 									# patch output file to handle special commands
 									override_output_file = self.bld.is_option_true('show_preprocessed_file')  or self.bld.is_option_true('show_disassembly')
 									if override_output_file == True:	
@@ -354,16 +347,18 @@ class Parallel(object):
 											file_ext = '.i'
 										else:
 											self.bld.fatal("Command option file extension output file implementation missing.")
-														
+
 										# Set output file
 										out_file = input.change_ext(file_ext)
 										tsk.outputs[0] = out_file
-										
+
 										# Add post build message to allow VS user to open the file
 										if getattr(self.bld.options, 'execsolution', ""):
-											self.bld.post_build_msg_warning.append('%s(0): warning: %s.' % (out_file.abspath(), "Click here to open output file"))			
+											self.bld.post_build_msg_warning.append(
+											    f'{out_file.abspath()}(0): warning: Click here to open output file.'
+											)
 									break
-									
+
 			except Exception:
 				self.processed += 1
 				# TODO waf 1.7 this piece of code should go in the error_handler
@@ -375,9 +370,8 @@ class Parallel(object):
 						if Logs.verbose > 1 or not self.error:
 							self.error.append(tsk)
 						self.stop = True
-					else:
-						if Logs.verbose > 1:
-							self.error.append(tsk)
+					elif Logs.verbose > 1:
+						self.error.append(tsk)
 					continue
 				tsk.hasrun = Task.EXCEPTION
 				self.error_handler(tsk)

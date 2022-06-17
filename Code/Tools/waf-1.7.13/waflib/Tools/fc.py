@@ -7,6 +7,7 @@
 fortran support
 """
 
+
 import re
 
 from waflib import Utils, Task, TaskGen, Logs
@@ -14,10 +15,26 @@ from waflib.Tools import ccroot, fc_config, fc_scan
 from waflib.TaskGen import feature, before_method, after_method, extension
 from waflib.Configure import conf
 
-ccroot.USELIB_VARS['fc'] = set(['FCFLAGS', 'DEFINES', 'INCLUDES'])
-ccroot.USELIB_VARS['fcprogram_test'] = ccroot.USELIB_VARS['fcprogram'] = set(['LIB', 'STLIB', 'LIBPATH', 'STLIBPATH', 'LINKFLAGS', 'RPATH', 'LINKDEPS'])
-ccroot.USELIB_VARS['fcshlib'] = set(['LIB', 'STLIB', 'LIBPATH', 'STLIBPATH', 'LINKFLAGS', 'RPATH', 'LINKDEPS'])
-ccroot.USELIB_VARS['fcstlib'] = set(['ARFLAGS', 'LINKDEPS'])
+ccroot.USELIB_VARS['fc'] = {'FCFLAGS', 'DEFINES', 'INCLUDES'}
+ccroot.USELIB_VARS['fcprogram_test'] = ccroot.USELIB_VARS['fcprogram'] = {
+    'LIB',
+    'STLIB',
+    'LIBPATH',
+    'STLIBPATH',
+    'LINKFLAGS',
+    'RPATH',
+    'LINKDEPS',
+}
+ccroot.USELIB_VARS['fcshlib'] = {
+    'LIB',
+    'STLIB',
+    'LIBPATH',
+    'STLIBPATH',
+    'LINKFLAGS',
+    'RPATH',
+    'LINKDEPS',
+}
+ccroot.USELIB_VARS['fcstlib'] = {'ARFLAGS', 'LINKDEPS'}
 
 @feature('fcprogram', 'fcshlib', 'fcstlib', 'fcprogram_test')
 def dummy(self):
@@ -34,10 +51,12 @@ def modfile(conf, name):
 	Turn a module name into the right module file name.
 	Defaults to all lower case.
 	"""
-	return {'lower'     :name.lower() + '.mod',
-		'lower.MOD' :name.upper() + '.MOD',
-		'UPPER.mod' :name.upper() + '.mod',
-		'UPPER'     :name.upper() + '.MOD'}[conf.env.FC_MOD_CAPITALIZATION or 'lower']
+	return {
+	    'lower': f'{name.lower()}.mod',
+	    'lower.MOD': f'{name.upper()}.MOD',
+	    'UPPER.mod': f'{name.upper()}.mod',
+	    'UPPER': f'{name.upper()}.MOD',
+	}[conf.env.FC_MOD_CAPITALIZATION or 'lower']
 
 def get_fortran_tasks(tsk):
 	"""
@@ -121,7 +140,7 @@ class fc(Task.Task):
 					name = bld.modfile(x.replace('USE@', ''))
 					node = bld.srcnode.find_resource(name)
 					if node and node not in tsk.outputs:
-						if not node in bld.node_deps[key]:
+						if node not in bld.node_deps[key]:
 							bld.node_deps[key].append(node)
 						ins[id(node)].add(tsk)
 

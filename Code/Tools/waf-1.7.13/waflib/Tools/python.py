@@ -90,7 +90,8 @@ def install_pyfile(self, node, install_from=None):
 	"""
 
 	from_node = install_from or node.parent
-	tsk = self.bld.install_as(self.install_path + '/' + node.path_from(from_node), node, postpone=False)
+	tsk = self.bld.install_as(
+	    f'{self.install_path}/{node.path_from(from_node)}', node, postpone=False)
 	path = tsk.get_install_path()
 
 	if self.bld.is_install < 0:
@@ -108,7 +109,7 @@ def install_pyfile(self, node, install_from=None):
 			Logs.error('The python file is missing, this should not happen')
 
 		for x in ['c', 'o']:
-			do_inst = self.env['PY' + x.upper()]
+			do_inst = self.env[f'PY{x.upper()}']
 			try:
 				st2 = os.stat(path + x)
 			except OSError:
@@ -123,8 +124,7 @@ def install_pyfile(self, node, install_from=None):
 				argv = self.env['PYTHON'] + lst + ['-c', INST, a, b, c]
 				Logs.info('+ byte compiling %r' % (path + x))
 				env = self.env.env or None
-				ret = Utils.subprocess.Popen(argv, env=env).wait()
-				if ret:
+				if ret := Utils.subprocess.Popen(argv, env=env).wait():
 					raise Errors.WafError('py%s compilation failed %r' % (x, path))
 
 @feature('py')
@@ -143,7 +143,7 @@ def init_pyext(self):
 	*lib* prefix from library names.
 	"""
 	self.uselib = self.to_list(getattr(self, 'uselib', []))
-	if not 'PYEXT' in self.uselib:
+	if 'PYEXT' not in self.uselib:
 		self.uselib.append('PYEXT')
 	# override shlib_PATTERN set by the osx module
 	self.env.cshlib_PATTERN = self.env.cxxshlib_PATTERN = self.env.macbundle_PATTERN = self.env.pyext_PATTERN
@@ -168,7 +168,7 @@ def init_pyembed(self):
 	Add the PYEMBED variable.
 	"""
 	self.uselib = self.to_list(getattr(self, 'uselib', []))
-	if not 'PYEMBED' in self.uselib:
+	if 'PYEMBED' not in self.uselib:
 		self.uselib.append('PYEMBED')
 
 @conf
@@ -191,8 +191,7 @@ def get_python_variables(self, variables, imports=None):
 
 	program = list(imports) # copy
 	program.append('')
-	for v in variables:
-		program.append("print(repr(%s))" % v)
+	program.extend(f"print(repr({v}))" for v in variables)
 	os_env = dict(os.environ)
 	try:
 		del os_env['MACOSX_DEPLOYMENT_TARGET'] # see comments in the OSX tool
@@ -275,22 +274,46 @@ def check_python_headers(conf):
 		if not result and env['LIBPATH_PYEMBED']:
 			path = env['LIBPATH_PYEMBED']
 			conf.to_log("\n\n# Trying default LIBPATH_PYEMBED: %r\n" % path)
-			result = conf.check(lib=name, uselib='PYEMBED', libpath=path, mandatory=False, msg='Checking for library %s in LIBPATH_PYEMBED' % name)
+			result = conf.check(
+			    lib=name,
+			    uselib='PYEMBED',
+			    libpath=path,
+			    mandatory=False,
+			    msg=f'Checking for library {name} in LIBPATH_PYEMBED',
+			)
 
 		if not result and dct['LIBDIR']:
 			path = [dct['LIBDIR']]
 			conf.to_log("\n\n# try again with -L$python_LIBDIR: %r\n" % path)
-			result = conf.check(lib=name, uselib='PYEMBED', libpath=path, mandatory=False, msg='Checking for library %s in LIBDIR' % name)
+			result = conf.check(
+			    lib=name,
+			    uselib='PYEMBED',
+			    libpath=path,
+			    mandatory=False,
+			    msg=f'Checking for library {name} in LIBDIR',
+			)
 
 		if not result and dct['LIBPL']:
 			path = [dct['LIBPL']]
 			conf.to_log("\n\n# try again with -L$python_LIBPL (some systems don't install the python library in $prefix/lib)\n")
-			result = conf.check(lib=name, uselib='PYEMBED', libpath=path, mandatory=False, msg='Checking for library %s in python_LIBPL' % name)
+			result = conf.check(
+			    lib=name,
+			    uselib='PYEMBED',
+			    libpath=path,
+			    mandatory=False,
+			    msg=f'Checking for library {name} in python_LIBPL',
+			)
 
 		if not result:
 			path = [os.path.join(dct['prefix'], "libs")]
 			conf.to_log("\n\n# try again with -L$prefix/libs, and pythonXY name rather than pythonX.Y (win32)\n")
-			result = conf.check(lib=name, uselib='PYEMBED', libpath=path, mandatory=False, msg='Checking for library %s in $prefix/libs' % name)
+			result = conf.check(
+			    lib=name,
+			    uselib='PYEMBED',
+			    libpath=path,
+			    mandatory=False,
+			    msg=f'Checking for library {name} in $prefix/libs',
+			)
 
 		if result:
 			break # do not forget to set LIBPATH_PYEMBED
@@ -311,7 +334,16 @@ def check_python_headers(conf):
 	# We check that pythonX.Y-config exists, and if it exists we
 	# use it to get only the includes, else fall back to distutils.
 	num = '.'.join(env['PYTHON_VERSION'].split('.')[:2])
-	conf.find_program([''.join(pybin) + '-config', 'python%s-config' % num, 'python-config-%s' % num, 'python%sm-config' % num], var='PYTHON_CONFIG', mandatory=False)
+	conf.find_program(
+	    [
+	        ''.join(pybin) + '-config',
+	        f'python{num}-config',
+	        f'python-config-{num}',
+	        f'python{num}m-config',
+	    ],
+	    var='PYTHON_CONFIG',
+	    mandatory=False,
+	)
 
 	includes = []
 	if conf.env.PYTHON_CONFIG:
@@ -354,22 +386,43 @@ def check_python_headers(conf):
 		   errmsg=':-(')
 	except conf.errors.ConfigurationError:
 		# python3.2, oh yeah
-		xx = conf.env.CXX_NAME and 'cxx' or 'c'
+		xx = 'cxx' if conf.env.CXX_NAME else 'c'
 
 		flags = ['--cflags', '--libs', '--ldflags']
 
 		for f in flags:
-			conf.check_cfg(msg='Asking python-config for pyembed %s flags' % f,
-				path=conf.env.PYTHON_CONFIG, package='', uselib_store='PYEMBED', args=[f])
-		conf.check(header_name='Python.h', define_name='HAVE_PYTHON_H', msg='Getting pyembed flags from python-config',
-			fragment=FRAG, errmsg='Could not build a python embedded interpreter',
-			features='%s %sprogram pyembed' % (xx, xx))
+			conf.check_cfg(
+			    msg=f'Asking python-config for pyembed {f} flags',
+			    path=conf.env.PYTHON_CONFIG,
+			    package='',
+			    uselib_store='PYEMBED',
+			    args=[f],
+			)
+		conf.check(
+		    header_name='Python.h',
+		    define_name='HAVE_PYTHON_H',
+		    msg='Getting pyembed flags from python-config',
+		    fragment=FRAG,
+		    errmsg='Could not build a python embedded interpreter',
+		    features=f'{xx} {xx}program pyembed',
+		)
 
 		for f in flags:
-			conf.check_cfg(msg='Asking python-config for pyext %s flags' % f,
-				path=conf.env.PYTHON_CONFIG, package='', uselib_store='PYEXT', args=[f])
-		conf.check(header_name='Python.h', define_name='HAVE_PYTHON_H', msg='Getting pyext flags from python-config',
-			features='%s %sshlib pyext' % (xx, xx), fragment=FRAG, errmsg='Could not build python extensions')
+			conf.check_cfg(
+			    msg=f'Asking python-config for pyext {f} flags',
+			    path=conf.env.PYTHON_CONFIG,
+			    package='',
+			    uselib_store='PYEXT',
+			    args=[f],
+			)
+		conf.check(
+		    header_name='Python.h',
+		    define_name='HAVE_PYTHON_H',
+		    msg='Getting pyext flags from python-config',
+		    features=f'{xx} {xx}shlib pyext',
+		    fragment=FRAG,
+		    errmsg='Could not build python extensions',
+		)
 
 @conf
 def check_python_version(conf, minver=None):
@@ -418,9 +471,9 @@ def check_python_version(conf, minver=None):
 				(pydir,) = conf.get_python_variables( ["get_python_lib(standard_lib=0, prefix=%r) or ''" % conf.env['PREFIX']])
 			if python_LIBDEST is None:
 				if conf.env['LIBDIR']:
-					python_LIBDEST = os.path.join(conf.env['LIBDIR'], "python" + pyver)
+					python_LIBDEST = os.path.join(conf.env['LIBDIR'], f"python{pyver}")
 				else:
-					python_LIBDEST = os.path.join(conf.env['PREFIX'], "lib", "python" + pyver)
+					python_LIBDEST = os.path.join(conf.env['PREFIX'], "lib", f"python{pyver}")
 
 
 		if 'PYTHONARCHDIR' in conf.environ:
@@ -443,7 +496,11 @@ def check_python_version(conf, minver=None):
 		conf.msg('Checking for python version', pyver_full)
 	else:
 		minver_str = '.'.join(map(str, minver))
-		conf.msg('Checking for python version', pyver_tuple, ">= %s" % (minver_str,) and 'GREEN' or 'YELLOW')
+		conf.msg(
+		    'Checking for python version',
+		    pyver_tuple,
+		    f">= {minver_str}" and 'GREEN' or 'YELLOW',
+		)
 
 	if not result:
 		conf.fatal('The python version is too old, expecting %r' % (minver,))

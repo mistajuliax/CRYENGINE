@@ -16,7 +16,14 @@ def configure_mono(conf):
 	v = conf.env
 	v['MONO'] = conf.CreateRootRelativePath('Code/SDKs/Mono/bin/mcs')
 	mono_lib_path = conf.CreateRootRelativePath('Code/SDKs/Mono/lib/mono')
-	v['MONO_FLAGS'] =   ['-target:library', '-langversion:4', '-platform:anycpu', '-optimize', '-g', '-L ' + mono_lib_path]
+	v['MONO_FLAGS'] = [
+	    '-target:library',
+	    '-langversion:4',
+	    '-platform:anycpu',
+	    '-optimize',
+	    '-g',
+	    f'-L {mono_lib_path}',
+	]
 	# TODO: for debug add -debug
 	v['MONO_TGT_F'] = ['-out:']
 	
@@ -38,22 +45,20 @@ class mono(Task.Task):
 			except:
 				pass
 
-		file_cs_meta = open(self.cs_meta_data_node.abspath(), 'wb')
-		file_cs_meta.write("using System.Reflection;\n")
-		file_cs_meta.write("[assembly: AssemblyProduct(\"%s\")]\n" % gen.name)
-		file_cs_meta.write("[assembly: AssemblyTitle(\"%s\")]\n" % gen.name)
-		file_cs_meta.write("[assembly: AssemblyDescription(\"%s\")]\n" % gen.name)
-		file_cs_meta.write("[assembly: AssemblyVersion(\"%s\")]\n" % bld.get_product_version())
-		file_cs_meta.write("[assembly: AssemblyCompany(\"%s\")]\n" % bld.get_company_name())
-		file_cs_meta.write("[assembly: AssemblyCopyright(\"%s\")]\n" % bld.get_copyright())
-		file_cs_meta.close()
-		
+		with open(self.cs_meta_data_node.abspath(), 'wb') as file_cs_meta:
+			file_cs_meta.write("using System.Reflection;\n")
+			file_cs_meta.write("[assembly: AssemblyProduct(\"%s\")]\n" % gen.name)
+			file_cs_meta.write("[assembly: AssemblyTitle(\"%s\")]\n" % gen.name)
+			file_cs_meta.write("[assembly: AssemblyDescription(\"%s\")]\n" % gen.name)
+			file_cs_meta.write("[assembly: AssemblyVersion(\"%s\")]\n" % bld.get_product_version())
+			file_cs_meta.write("[assembly: AssemblyCompany(\"%s\")]\n" % bld.get_company_name())
+			file_cs_meta.write("[assembly: AssemblyCopyright(\"%s\")]\n" % bld.get_copyright())
 		# Execute mono command
-		mcs_cmd = '%s %s %s' % (env['MONO'], ' '.join(env['MONO_FLAGS']), self.cs_meta_data_node.abspath())
+		mcs_cmd = f"{env['MONO']} {' '.join(env['MONO_FLAGS'])} {self.cs_meta_data_node.abspath()}"
 		for cs_source_node in self.inputs:
-			mcs_cmd += ' %s' % cs_source_node.abspath()
-		
-		mcs_cmd += ' %s%s' % (' '.join(env['MONO_TGT_F']), self.outputs[0].abspath())		
+			mcs_cmd += f' {cs_source_node.abspath()}'
+
+		mcs_cmd += f" {' '.join(env['MONO_TGT_F'])}{self.outputs[0].abspath()}"
 		return self.exec_command(mcs_cmd, env=env.env or None)
 
 @feature('swig')
@@ -61,17 +66,17 @@ def create_mono_task(self):
 	bld 			= self.bld
 	platform	= bld.env['PLATFORM']
 	configuration = bld.env['CONFIGURATION']
-	
+
 	if platform  == 'project_generator':
 		return
-		
+
 	if not getattr(self, 'mono_source', []):
 		return
 
 	# Create Mono task
-	mono_output_node = self.path.make_node('CryEngine.Common.dll')	
+	mono_output_node = self.path.make_node('CryEngine.Common.dll')
 	mono_task = self.create_task('mono', self.mono_source, [mono_output_node])
-	mono_task.cs_meta_data_node = self.path.make_node(self.name + '_meta.cs')
+	mono_task.cs_meta_data_node = self.path.make_node(f'{self.name}_meta.cs')
 
 	# Copy to output folder
 	output_folder = self.bld.get_output_folders(platform, configuration)[0]

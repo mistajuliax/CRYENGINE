@@ -10,24 +10,36 @@ from waflib.Utils import run_once
 def module_extensions_sdl2(ctx, kw, entry_prefix, platform, configuration):
 
 	if platform.startswith('win_x86'):
-		kw[entry_prefix + 'includes'] += [ ctx.CreateRootRelativePath('Code/SDKs/SDL2/include/win') ]
-		kw[entry_prefix + 'lib']      += [ 'SDL2' ]
-		kw[entry_prefix + 'libpath']  += [ ctx.CreateRootRelativePath('Code/SDKs/SDL2/lib/win_x86') ]
+		kw[f'{entry_prefix}includes'] += [
+		    ctx.CreateRootRelativePath('Code/SDKs/SDL2/include/win')
+		]
+		kw[f'{entry_prefix}lib'] += [ 'SDL2' ]
+		kw[f'{entry_prefix}libpath'] += [
+		    ctx.CreateRootRelativePath('Code/SDKs/SDL2/lib/win_x86')
+		]
 
 	elif platform.startswith('win_x64'):
-		kw[entry_prefix + 'includes'] += [ ctx.CreateRootRelativePath('Code/SDKs/SDL2/include/win') ]
-		kw[entry_prefix + 'lib']      += [ 'SDL2' ]
-		kw[entry_prefix + 'libpath']  += [ ctx.CreateRootRelativePath('Code/SDKs/SDL2/lib/win_x64') ]
+		kw[f'{entry_prefix}includes'] += [
+		    ctx.CreateRootRelativePath('Code/SDKs/SDL2/include/win')
+		]
+		kw[f'{entry_prefix}lib'] += [ 'SDL2' ]
+		kw[f'{entry_prefix}libpath'] += [
+		    ctx.CreateRootRelativePath('Code/SDKs/SDL2/lib/win_x64')
+		]
 
 	elif platform.startswith('linux_x64'):
-		kw[entry_prefix + 'includes'] += [ ctx.CreateRootRelativePath('Code/SDKs/SDL2/include/linux') ]
-		kw[entry_prefix + 'lib']      += [ 'SDL2' ]
-		kw[entry_prefix + 'libpath']  += [ ctx.CreateRootRelativePath('Code/SDKs/SDL2/lib/linux_x64') ]
+		kw[f'{entry_prefix}includes'] += [
+		    ctx.CreateRootRelativePath('Code/SDKs/SDL2/include/linux')
+		]
+		kw[f'{entry_prefix}lib'] += [ 'SDL2' ]
+		kw[f'{entry_prefix}libpath'] += [
+		    ctx.CreateRootRelativePath('Code/SDKs/SDL2/lib/linux_x64')
+		]
 	else:
 		return
 
-	if not platform  == 'project_generator':
-		kw[entry_prefix + 'features'] += [ 'copy_sdl2_binaries' ]
+	if platform != 'project_generator':
+		kw[f'{entry_prefix}features'] += [ 'copy_sdl2_binaries' ]
 
 @feature('copy_sdl2_binaries')
 @run_once
@@ -52,7 +64,7 @@ def feature_copy_sdl2_binaries(self):
 		libfolder = 'linux_x64'
 
 	else:
-		Logs.error('[ERROR] WAF does not support SDL2 for platform %s.' % platform)
+		Logs.error(f'[ERROR] WAF does not support SDL2 for platform {platform}.')
 		return
 
 	sdl2_libpath = bld.CreateRootRelativePath('Code/SDKs/SDL2/lib') + os.sep + libfolder
@@ -69,7 +81,7 @@ def feature_copy_sdl2_binaries(self):
 		if os.path.isfile(os.path.join(sdl2_libpath, f)):
 			self.create_task('copy_outputs', self.bld.root.make_node(os.path.join(sdl2_libpath, f)), output_folder.make_node(f))
 		else:
-			Logs.error('[ERROR] Could not copy %s: file not found in %s.' % (f, sdl2_libpath))
+			Logs.error(f'[ERROR] Could not copy {f}: file not found in {sdl2_libpath}.')
 
 
 ############################################################################################################
@@ -78,18 +90,25 @@ def feature_copy_sdl2_binaries(self):
 def module_extensions_sdl_mixer(ctx, kw, entry_prefix, platform, configuration):
 
 	if platform.startswith('win'):
-		kw[entry_prefix + 'includes'] += [ ctx.CreateRootRelativePath('Code/SDKs/Audio/SDL_mixer/include') ]
-		kw[entry_prefix + 'lib'] += [ 'SDL2_mixer' ]		
-		arch = ('x64' if platform == 'win_x64' else 'x86')		
-		kw[entry_prefix + 'libpath'] += [ ctx.CreateRootRelativePath('Code/SDKs/Audio/SDL_mixer/lib') + os.sep + arch ]
+		kw[f'{entry_prefix}includes'] += [
+		    ctx.CreateRootRelativePath('Code/SDKs/Audio/SDL_mixer/include')
+		]
+		kw[f'{entry_prefix}lib'] += [ 'SDL2_mixer' ]
+		arch = ('x64' if platform == 'win_x64' else 'x86')
+		kw[f'{entry_prefix}libpath'] += [
+		    ctx.CreateRootRelativePath('Code/SDKs/Audio/SDL_mixer/lib') + os.sep +
+		    arch
+		]
 	elif platform.startswith('linux'):
-		kw[entry_prefix + 'includes'] += [ ctx.CreateRootRelativePath('Code/SDKs/Audio/SDL_mixer/include') ]
+		kw[f'{entry_prefix}includes'] += [
+		    ctx.CreateRootRelativePath('Code/SDKs/Audio/SDL_mixer/include')
+		]
 		Logs.warn('[WARNING] SDL_Mixer binaries missing')
 	else:
-		Logs.error('[ERROR] SDL_Mixer is not supported for plaform %s by WAF' % platform)
-		
-	if not platform  == 'project_generator':
-		kw[entry_prefix + 'features'] += [ 'copy_sdl2_mixer_binaries' ]
+		Logs.error(f'[ERROR] SDL_Mixer is not supported for plaform {platform} by WAF')
+
+	if platform != 'project_generator':
+		kw[f'{entry_prefix}features'] += [ 'copy_sdl2_mixer_binaries' ]
 
 @feature('copy_sdl2_mixer_binaries')
 @run_once
@@ -97,23 +116,22 @@ def feature_copy_sdl_mixer_binaries(self):
 	bld 			= self.bld
 	platform	= bld.env['PLATFORM']
 	configuration = bld.env['CONFIGURATION']
-		
+
 	if platform  == 'project_generator':
 		return
-		
-	sdl_mixer_binaries = [ 'SDL2_mixer', 'libogg-0', 'libvorbis-0', 'libvorbisfile-3', 'smpeg2' ]
+
 	output_folder = bld.get_output_folders(platform, configuration)[0]
-	
+
 	if platform.startswith('win'):
 		arch = ('x64' if platform == 'win_x64' else 'x86')
 		extention = '.dll'
 
 		# Copy SDL mixer
 		sdl_mixer_base = bld.CreateRootRelativePath('Code/SDKs/Audio/SDL_mixer/lib') + os.sep  + arch + os.sep
+		sdl_mixer_binaries = [ 'SDL2_mixer', 'libogg-0', 'libvorbis-0', 'libvorbisfile-3', 'smpeg2' ]
 		for bin_name in sdl_mixer_binaries:
 			sdl_mixer_bin = sdl_mixer_base +  bin_name
 			self.create_task('copy_outputs', bld.root.make_node(sdl_mixer_bin + extention), output_folder.make_node(bin_name + extention))
-	elif platform.startswith('linux'):
-		pass
-	else:
-		Logs.error('[ERROR] SDL_Mixer is not supported for plaform %s by WAF.'  % platform)
+	elif not platform.startswith('linux'):
+		Logs.error(
+		    f'[ERROR] SDL_Mixer is not supported for plaform {platform} by WAF.')

@@ -11,17 +11,14 @@ The generated files are compiled into object files.
 import waflib.TaskGen, os, re
 
 def decide_ext(self, node):
-	if 'cxx' in self.features:
-		return ['.lex.cc']
-	return ['.lex.c']
+	return ['.lex.cc'] if 'cxx' in self.features else ['.lex.c']
 
 def flexfun(tsk):
 	env = tsk.env
 	bld = tsk.generator.bld
 	wd = bld.variant_dir
 	def to_list(xx):
-		if isinstance(xx, str): return [xx]
-		return xx
+		return [xx] if isinstance(xx, str) else xx
 	tsk.last_cmd = lst = []
 	lst.extend(to_list(env['FLEX']))
 	lst.extend(to_list(env['FLEXFLAGS']))

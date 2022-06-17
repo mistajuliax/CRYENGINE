@@ -158,7 +158,7 @@ class PBXGroup(XCodeNode):
 			#print(n.parent)
 			if n == root:
 				return self
-			if n == None:
+			if n is None:
 				return self
 			try:
 				return folders[n]
@@ -181,10 +181,8 @@ class PBXLegacyTarget(XCodeNode):
 	def __init__(self, action, target=''):
 		XCodeNode.__init__(self)
 		self.buildConfigurationList = XCConfigurationList([XCBuildConfiguration('waf', {})])
-		if not target:
-			self.buildArgumentsString = "%s %s" % (sys.argv[0], action)
-		else:
-			self.buildArgumentsString = "%s %s --targets=%s" % (sys.argv[0], action, target)
+		self.buildArgumentsString = (f"{sys.argv[0]} {action} --targets={target}"
+		                             if target else f"{sys.argv[0]} {action}")
 		self.buildPhases = []
 		self.buildToolPath = sys.executable
 		self.buildWorkingDirectory = ""
@@ -202,7 +200,8 @@ class PBXShellScriptBuildPhase(XCodeNode):
 		self.outputPaths = []
 		self.runOnlyForDeploymentPostProcessing = 0
 		self.shellPath = "/bin/sh"
-		self.shellScript = "%s %s %s --targets=%s" % (sys.executable, sys.argv[0], action, target)
+		self.shellScript = (
+		    f"{sys.executable} {sys.argv[0]} {action} --targets={target}")
 
 class PBXNativeTarget(XCodeNode):
 	def __init__(self, action, target, node, env):
@@ -270,9 +269,8 @@ class xcode(Build.BuildContext):
 			if not isinstance(x, str):
 				include_files.append(x)
 				continue
-			d = tg.path.find_node(x)
-			if d:
-				lst = [y for y in d.ant_glob(HEADERS_GLOB, flat=False)]
+			if d := tg.path.find_node(x):
+				lst = list(d.ant_glob(HEADERS_GLOB, flat=False))
 				include_files.extend(lst)
 
 		# remove duplicates
@@ -305,8 +303,7 @@ class xcode(Build.BuildContext):
 				group.add(tg.path, self.collect_source(tg))
 				p.mainGroup.children.append(group)
 
-				if 'cprogram' or 'cxxprogram' in features:
-					p.add_task_gen(tg)
+				p.add_task_gen(tg)
 
 
 		# targets that don't produce the executable but that you might want to run
@@ -315,7 +312,7 @@ class xcode(Build.BuildContext):
 		p.targets.append(PBXLegacyTarget('install'))
 		p.targets.append(PBXLegacyTarget('check'))
 		p.targets.append(PBXLegacyTarget('build_darwin_profile'))
-		node = self.srcnode.make_node('%s.xcodeproj' % appname)
+		node = self.srcnode.make_node(f'{appname}.xcodeproj')
 		node.mkdir()
 		node = node.make_node('project.pbxproj')
 		p.write(open(node.abspath(), 'w'))

@@ -120,7 +120,7 @@ class BuildContext(Context.Context):
 		"""
 		Map group names to the group lists. See :py:meth:`waflib.Build.BuildContext.add_group`
 		"""
-		
+
 		self.variant_sub_dir = ""
 		"""
 		Allows user to point the build to a specific directory within the variant directory. 
@@ -134,7 +134,7 @@ class BuildContext(Context.Context):
 				self.variant_sub_dir = self.options.project_spec
 			else:
 				self.variant_sub_dir = '_shared'
-				
+
 		if not self.variant:
 			return self.out_dir
 		return os.path.join(self.out_dir, self.variant, self.variant_sub_dir)
@@ -216,7 +216,7 @@ class BuildContext(Context.Context):
 		node = self.root.find_node(self.cache_dir)
 		if not node:
 			raise Errors.WafError('The project was not configured: run "waf configure" first!')
-		lst = node.ant_glob('**/*%s' % CACHE_SUFFIX, quiet=True)
+		lst = node.ant_glob(f'**/*{CACHE_SUFFIX}', quiet=True)
 
 		if not lst:
 			raise Errors.WafError('The cache directory is empty: reconfigure the project')
@@ -325,7 +325,7 @@ class BuildContext(Context.Context):
 			data = Utils.readf(dbfn, 'rb')
 		except (IOError, EOFError):
 			# handle missing file/empty file
-			Logs.debug('build: Could not load the build cache %s (missing)' % dbfn)
+			Logs.debug(f'build: Could not load the build cache {dbfn} (missing)')
 		else:
 			try:
 				waflib.Node.pickle_lock.acquire()
@@ -360,18 +360,18 @@ class BuildContext(Context.Context):
 		finally:
 			waflib.Node.pickle_lock.release()
 
-		Utils.writef(db + '.tmp', x, m='wb')
+		Utils.writef(f'{db}.tmp', x, m='wb')
 
 		try:
 			st = os.stat(db)
 			os.remove(db)
 			if not Utils.is_win32: # win32 has no chown but we're paranoid
-				os.chown(db + '.tmp', st.st_uid, st.st_gid)
+				os.chown(f'{db}.tmp', st.st_uid, st.st_gid)
 		except (AttributeError, OSError):
 			pass
 
 		# do not use shutil.move (copy is not thread-safe)
-		os.rename(db + '.tmp', db)
+		os.rename(f'{db}.tmp', db)
 
 	def compile(self):
 		"""
@@ -487,7 +487,7 @@ class BuildContext(Context.Context):
 			if not env:
 				return Utils.SIG_NIL
 
-		idx = str(id(env)) + str(vars_lst)
+		idx = id(env) + str(vars_lst)
 		try:
 			cache = self.cache_env
 		except AttributeError:
@@ -546,17 +546,15 @@ Current Settings: Spec: %r, Config: %r, Platform %r""" % (name, Options.options.
 		eta = str(self.timer)
 		fs = "[%%%dd/%%%dd][%%s%%2d%%%%%%s][%s][" % (n, n, ind)
 		left = fs % (state, total, col1, pc, col2)
-		right = '][%s%s%s]' % (col1, eta, col2)
+		right = f'][{col1}{eta}{col2}]'
 
 		cols = Logs.get_term_cols() - len(left) - len(right) + 2*len(col1) + 2*len(col2)
-		if cols < 7: cols = 7
+		cols = max(cols, 7)
 
 		ratio = ((cols*state)//total) - 1
 
 		bar = ('='*ratio+'>').ljust(cols)
-		msg = Utils.indicator % (left, bar, right)
-
-		return msg
+		return Utils.indicator % (left, bar, right)
 
 	def declare_chain(self, *k, **kw):
 		"""
@@ -623,7 +621,7 @@ Current Settings: Spec: %r, Config: %r, Platform %r""" % (name, Options.options.
 	def add_to_group(self, tgen, group=None):
 		"""add a task or a task generator for the build"""
 		# paranoid
-		assert(isinstance(tgen, TaskGen.task_gen) or isinstance(tgen, Task.TaskBase))
+		assert isinstance(tgen, (TaskGen.task_gen, Task.TaskBase))
 		tgen.bld = self
 		self.get_group(group).append(tgen)
 
@@ -631,10 +629,8 @@ Current Settings: Spec: %r, Config: %r, Platform %r""" % (name, Options.options.
 		"""name for the group g (utility)"""
 		if not isinstance(g, list):
 			g = self.groups[g]
-		for x in self.group_names:
-			if id(self.group_names[x]) == id(g):
-				return x
-		return ''
+		return next((x for x in self.group_names if id(self.group_names[x]) == id(g)),
+		            '')
 
 	def get_group_idx(self, tg):
 		"""
@@ -666,7 +662,7 @@ Current Settings: Spec: %r, Config: %r, Platform %r""" % (name, Options.options.
 		#if self.groups and not self.groups[0].tasks:
 		#	error('add_group: an empty group is already present')
 		if name and name in self.group_names:
-			Logs.error('add_group: name %s already present' % name)
+			Logs.error(f'add_group: name {name} already present')
 		g = []
 		self.group_names[name] = g
 		self.groups.append(g)
@@ -705,10 +701,7 @@ Current Settings: Spec: %r, Config: %r, Platform %r""" % (name, Options.options.
 			for tg in group:
 				try:
 					num_tasks = len(tg.tasks)
-					if num_tasks != 0:
-						total += num_tasks
-					else:
-						total += 1
+					total += num_tasks if num_tasks != 0 else 1
 				except AttributeError:
 					total += 1
 		return total
@@ -747,7 +740,8 @@ Current Settings: Spec: %r, Config: %r, Platform %r""" % (name, Options.options.
 		"""
 		Post the task generators from the group indexed by self.cur, used by :py:meth:`waflib.Build.BuildContext.get_build_iterator`
 		"""
-		if self.targets == '*':
+		if (self.targets != '*' and self.targets and self.cur < self._min_grp
+		    or self.targets == '*'):
 			for tg in self.groups[self.cur]:
 				try:
 					f = tg.post
@@ -756,24 +750,17 @@ Current Settings: Spec: %r, Config: %r, Platform %r""" % (name, Options.options.
 				else:
 					f()
 		elif self.targets:
-			if self.cur < self._min_grp:
-				for tg in self.groups[self.cur]:
-					try:
-						f = tg.post
-					except AttributeError:
-						pass
-					else:
-						f()
-			else:
-				for tg in self._exact_tg:
-					tg.post()
+			for tg in self._exact_tg:
+				tg.post()
 		else:
 			ln = self.launch_node()
 			if ln.is_child_of(self.bldnode):
 				Logs.warn('Building from the build directory, forcing --targets=*')
 				ln = self.srcnode
 			elif not ln.is_child_of(self.srcnode):
-				Logs.warn('CWD %s is not under %s, forcing --targets=* (run distclean?)' % (ln.abspath(), self.srcnode.abspath()))
+				Logs.warn(
+				    f'CWD {ln.abspath()} is not under {self.srcnode.abspath()}, forcing --targets=* (run distclean?)'
+				)
 				ln = self.srcnode
 			for tg in self.groups[self.cur]:
 				try:
@@ -869,7 +856,7 @@ class inst(Task.Task):
 				y = self.path.find_resource(x)
 				if not y:
 					if Logs.verbose:
-						Logs.warn('Could not find %s immediately (may cause broken builds)' % x)
+						Logs.warn(f'Could not find {x} immediately (may cause broken builds)')
 					idx = self.generator.bld.get_group_idx(self)
 					for tg in self.generator.bld.groups[idx]:
 						if not isinstance(tg, inst) and id(tg) != id(self):
@@ -984,11 +971,11 @@ class InstallContext(BuildContext):
 				# same size and identical timestamps -> make no copy
 				if st1.st_mtime + 2 >= st2.st_mtime and st1.st_size == st2.st_size:
 					if not self.progress_bar:
-						Logs.info('- install %s (from %s)' % (tgt, srclbl))
+						Logs.info(f'- install {tgt} (from {srclbl})')
 					return False
 
 		if not self.progress_bar:
-			Logs.info('+ install %s (from %s)' % (tgt, srclbl))
+			Logs.info(f'+ install {tgt} (from {srclbl})')
 
 		# following is for shared libs and stale inodes (-_-)
 		try:
@@ -1030,11 +1017,10 @@ class InstallContext(BuildContext):
 			try: os.remove(tgt)
 			except OSError: pass
 			if not self.progress_bar:
-				Logs.info('+ symlink %s (to %s)' % (tgt, src))
+				Logs.info(f'+ symlink {tgt} (to {src})')
 			os.symlink(src, tgt)
-		else:
-			if not self.progress_bar:
-				Logs.info('- symlink %s (to %s)' % (tgt, src))
+		elif not self.progress_bar:
+			Logs.info(f'- symlink {tgt} (to {src})')
 
 	def run_task_now(self, tsk, postpone):
 		"""
@@ -1165,7 +1151,7 @@ class UninstallContext(InstallContext):
 	def do_install(self, src, tgt, chmod=Utils.O644):
 		"""See :py:meth:`waflib.Build.InstallContext.do_install`"""
 		if not self.progress_bar:
-			Logs.info('- remove %s' % tgt)
+			Logs.info(f'- remove {tgt}')
 
 		self.uninstall.append(tgt)
 		try:
@@ -1190,7 +1176,7 @@ class UninstallContext(InstallContext):
 		"""See :py:meth:`waflib.Build.InstallContext.do_link`"""
 		try:
 			if not self.progress_bar:
-				Logs.info('- remove %s' % tgt)
+				Logs.info(f'- remove {tgt}')
 			os.remove(tgt)
 		except OSError:
 			pass
@@ -1285,8 +1271,7 @@ class ListContext(BuildContext):
 			self.get_tgen_by_name('')
 		except Exception:
 			pass
-		lst = list(self.task_gen_cache_names.keys())
-		lst.sort()
+		lst = sorted(self.task_gen_cache_names.keys())
 		for k in lst:
 			Logs.pprint('GREEN', k)
 
@@ -1330,21 +1315,15 @@ class StepContext(BuildContext):
 			for pat in self.files.split(','):
 				matcher = self.get_matcher(pat)
 				for tg in g:
-					if isinstance(tg, Task.TaskBase):
-						lst = [tg]
-					else:
-						lst = tg.tasks
+					lst = [tg] if isinstance(tg, Task.TaskBase) else tg.tasks
 					for tsk in lst:
-						do_exec = False
-						for node in getattr(tsk, 'inputs', []):
-							if matcher(node, output=False):
-								do_exec = True
-								break
-						for node in getattr(tsk, 'outputs', []):
-							if matcher(node, output=True):
-								do_exec = True
-								break
-						if do_exec:
+						if do_exec := next(
+						    (True for node in getattr(tsk, 'outputs', [])
+						     if matcher(node, output=True)),
+						    any(
+						        matcher(node, output=False)
+						        for node in getattr(tsk, 'inputs', [])),
+						):
 							ret = tsk.run()
 							Logs.info('%s -> exit %r' % (str(tsk), ret))
 
@@ -1374,10 +1353,7 @@ class StepContext(BuildContext):
 			if output == False and not inn:
 				return False
 
-			if anode:
-				return anode == node
-			else:
-				return pattern.match(node.abspath())
+			return anode == node if anode else pattern.match(node.abspath())
 		return match
 
 BuildContext.store = Utils.nogc(BuildContext.store)

@@ -94,7 +94,7 @@ colors_lst = {
 'cursor_off' :'\x1b[?25l',
 }
 
-got_tty = not os.environ.get('TERM', 'dumb') in ['dumb', 'emacs']
+got_tty = os.environ.get('TERM', 'dumb') not in ['dumb', 'emacs']
 if got_tty:
 	try:
 		got_tty = sys.stderr.isatty() and sys.stdout.isatty()
@@ -140,8 +140,7 @@ get_term_cols.__doc__ = """
 	"""
 
 def get_color(cl):
-	if not colors_lst['USE']: return ''
-	return colors_lst.get(cl, '')
+	return colors_lst.get(cl, '') if colors_lst['USE'] else ''
 
 class color_dict(object):
 	"""attribute-based color access, eg: colors.PINK"""
@@ -190,14 +189,13 @@ class log_filter(logging.Filter):
 				rec.c1 = colors.GREEN
 			return True
 
-		m = re_log.match(rec.msg)
-		if m:
+		if m := re_log.match(rec.msg):
 			rec.zone = m.group(1)
 			rec.msg = m.group(2)
 
 		if zones:
 			return getattr(rec, 'zone', '') in zones or '*' in zones
-		elif not verbose > 2:
+		elif verbose <= 2:
 			return False
 		return True
 
@@ -213,7 +211,7 @@ class formatter(logging.Formatter):
 				msg = rec.msg.decode('utf-8')
 			except Exception:
 				msg = rec.msg
-			return '%s%s%s' % (rec.c1, msg, rec.c2)
+			return f'{rec.c1}{msg}{rec.c2}'
 		return logging.Formatter.format(self, rec)
 
 log = None
@@ -236,8 +234,7 @@ def error(*k, **kw):
 	global log
 	log.error(*k, **kw)
 	if verbose > 2:
-		st = traceback.extract_stack()
-		if st:
+		if st := traceback.extract_stack():
 			st = st[:-1]
 			buf = []
 			for filename, lineno, name, line in st:
@@ -326,8 +323,8 @@ def pprint(col, str, label='', sep='\n'):
 	:param sep: a string to append at the end (line separator)
 	:type sep: string
 	"""
-	sys.stderr.write("%s%s%s %s%s" % (colors(col), str, colors.NORMAL, label, sep))
-	
+	sys.stderr.write(f"{colors(col)}{str}{colors.NORMAL} {label}{sep}")
+
 	for key, value in external_log_handlers.iteritems():
-		value.write_err("%s%s%s %s%s" % (colors(col), str, colors.NORMAL, label, sep))
+		value.write_err(f"{colors(col)}{str}{colors.NORMAL} {label}{sep}")
 

@@ -34,6 +34,7 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 """
 
+
 # Needed imports for PyInstaller to detect full extend of dependent modules
 import os, sys
 import json
@@ -41,13 +42,13 @@ import ttk
 import tkSimpleDialog
 import tkMessageBox
 import xml.etree.ElementTree
-						 
+
 VERSION="1.7.13"
 
 # Get executable directory path 
 # Note: (pyinstaller will be executed from a temp directory.
 cwd = os.getcwd()
-wafdir = os.path.abspath(cwd + '/Code/Tools/waf-1.7.13')
+wafdir = os.path.abspath(f'{cwd}/Code/Tools/waf-1.7.13')
 sys.path.insert(0, wafdir)
 
 if __name__ == '__main__':

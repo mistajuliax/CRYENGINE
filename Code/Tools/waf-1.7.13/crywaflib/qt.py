@@ -66,9 +66,9 @@ def get_qt_root_path(self):
 	else:
 		self.fatal('[ERROR] Unable to find QT build to use for MSVC %d' % msvc_version)
 
-	qt_version = QT_MAJOR_VERSION + '.' + QT_MINOR_VERSION
+	qt_version = f'{QT_MAJOR_VERSION}.{QT_MINOR_VERSION}'
 	qt_root = os.path.join(QT_ROOT, qt_version, qt_base)
-	
+
 	try:	
 		return self.CreateRootRelativePath(qt_root)
 	except:
@@ -85,31 +85,31 @@ def collect_qt_properties(self):
 	defines = [ 'QT_GUI_LIB', 'QT_NO_EMIT', 'QT_WIDGETS_LIB' ]
 	includes = [ qt_includes_folder ]
 	libpath = [ qt_libs_folder ]	
-	
+
 	if hasattr(self.env['CONFIG_OVERWRITES'], self.target):
 		configuration = self.env['CONFIG_OVERWRITES'][self.target]
 	else:
 		configuration =  self.env['CONFIGURATION']
-		
+
 	# Collect module libs	
 	libs = []
-	debug_postfix = 'd' if configuration == 'debug' else ''	
-	qt_modules_include_path_base = qt_includes_folder + '/Qt'
-	qt_lib_prefix = 'Qt' + QT_MAJOR_VERSION	
-	for module in qt_modules:	
+	debug_postfix = 'd' if configuration == 'debug' else ''
+	qt_modules_include_path_base = f'{qt_includes_folder}/Qt'
+	qt_lib_prefix = f'Qt{QT_MAJOR_VERSION}'
+	for module in qt_modules:
 		# Collect include path
 		includes += [qt_modules_include_path_base + module] # e.g. .../include/QtNetwork		
-		
+
 		# Collect lib and binary
-		lib_name = '%s%s%s' % (qt_lib_prefix, module, debug_postfix)
+		lib_name = f'{qt_lib_prefix}{module}{debug_postfix}'
 		libs += [lib_name]
 
 	# Save core binaries
 	# Note: icudt has special treatment since it's shared between release and debug configurations (as of v55 at least)
-	binaries = []
-	for binary in qt_core_binaries:
-		binaries += ['%s%s' % (binary, debug_postfix if binary != 'icudt' else '')]
-	
+	binaries = [
+	    f"{binary}{debug_postfix if binary != 'icudt' else ''}"
+	    for binary in qt_core_binaries
+	]
 	return (defines, includes, libpath, libs, binaries)
 
 @conf
@@ -140,26 +140,25 @@ class qt_moc(Task.Task):
 		self.h_node = None
 				
 	def runnable_status(self):
-	
+
 		for t in self.run_after:
 			if not t.hasrun:
 				return Task.ASK_LATER
-				
+
 		# Check if moc file exists
 		if not os.path.isfile(self.inputs[0].abspath()) or not os.path.isfile(self.outputs[0].abspath()):
 			return Task.RUN_ME
-		
+
 		status = Task.Task.runnable_status(self)
-		
-		if status == Task.SKIP_ME:
-			if os.stat(self.outputs[0].abspath()).st_size == 0:
-				self.remove_obj_from_linker() # remove empty moc file from linker
-				
+
+		if status == Task.SKIP_ME and os.stat(self.outputs[0].abspath()).st_size == 0:
+			self.remove_obj_from_linker() # remove empty moc file from linker
+
 		return status
 	
-	def run (self):
+	def run(self):
 		env = self.env
-		
+
 		cmd = '"%s" %s %s %s %s %s' % (
 			env['MOC'],
 			' '.join(env['MOC_FLAGS']),
@@ -180,9 +179,9 @@ class qt_moc(Task.Task):
 
 		# Combine stdout and stderr 
 		# Note: Incredibuild will return stderr via stdout whereas local builds keep the streams seperate	
-		out_str = out + err	
+		out_str = out + err
 		link_output = True
-			
+
 		if ret != 0:
 			self.err_msg = '<++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++>\n'	
 			self.err_msg += "Compilation failed - File: %r, Module: %r, Configuration: '%s|%s', error code %d\n" % (os.path.basename(self.outputs[0].abspath()), self.generator.target, self.generator.bld.env['PLATFORM'], self.generator.bld.env['CONFIGURATION'], ret )
@@ -195,24 +194,24 @@ class qt_moc(Task.Task):
 		# Check if file needed to be mocced. Otherwise return and strip file from linker			
 		elif out_str.rstrip().endswith('No output generated.'):			
 			link_output = False			
-			
+
 		if not link_output:
 			open(self.outputs[0].abspath(), 'wb' ).close() # create dummy file to make waf post_run step happy
 			self.remove_obj_from_linker()
 			return ret # early out
-		
+
 		if out_str:
-			self.generator.bld.to_log('MOC: %s' % out_str)
+			self.generator.bld.to_log(f'MOC: {out_str}')
 
 		# Run cxx command
 		tsk = Task.classes['cxx'](env=self.env, generator=self.generator)
 		tsk.set_inputs(self.inputs[0])
-		tsk.set_outputs(self.outputs[0])		
+		tsk.set_outputs(self.outputs[0])
 		ret = tsk.run()
-		
+
 		# Copy error message if there is any
 		if getattr(tsk, "err_msg", None):
-			self.err_msg = tsk.err_msg						
+			self.err_msg = tsk.err_msg
 		return ret		
 		
 	def remove_obj_from_linker(self):		
@@ -227,12 +226,12 @@ def apply_qt(self):
 	lst = []
 	for flag in self.to_list(self.env['CXXFLAGS']):
 		if len(flag) < 2: continue
-		f = flag[0:2]
+		f = flag[:2]
 		if f in ('-D', '-I', '/D', '/I'):
 			if (f[0] == '/'):
-				lst.append('-' + flag[1:])
+				lst.append(f'-{flag[1:]}')
 			else:
-				lst.append(flag)		
+				lst.append(flag)
 	self.env.append_value('MOC_FLAGS', lst)	
 
 @feature('qt')
@@ -258,22 +257,22 @@ def create_qt_moc_task(self, node):
 
 	if self.env['PLATFORM'] == 'project_generator':
 		return
-	
-	if not 'qt' in getattr(self, 'features', []):
+
+	if 'qt' not in getattr(self, 'features', []):
 		return
 
 	# Check for moc folder
 	moc_file_folder = self.bld.get_bintemp_folder_node()
-	moc_file_folder = moc_file_folder.make_node('moc_files').make_node(self.target)			
+	moc_file_folder = moc_file_folder.make_node('moc_files').make_node(self.target)
 	Utils.check_dir(moc_file_folder.abspath())	
-	
+
 	# Check for PCH file
 	pch = ''
 	if hasattr(self, 'pch_name'):
 		pch = self.pch_name.replace('.cpp', '.h')
 	elif hasattr(self, 'pch'):		
 		pch = self.pch.replace('.cpp', '.h')
-		
+
 	# Create moc task and store in list to create a dependency on the link_task later
 	moc_cxx_file = moc_file_folder.make_node(node.change_ext('_moc.cpp').name)
 	moc_task = self.create_compiled_task('qt_moc', moc_cxx_file)
@@ -293,7 +292,7 @@ class XMLHandler(ContentHandler):
 			self.buf = []
 	def endElement(self, name):
 		if name == 'file':
-			self.files.append(str(''.join(self.buf)))
+			self.files.append(''.join(self.buf))
 	def characters(self, cars):
 		self.buf.append(cars)
 		
@@ -341,9 +340,10 @@ class rcc(Task.Task):
 		names = []
 		root = self.inputs[0].parent
 		for x in curHandler.files:
-			nd = root.find_resource(x)
-			if nd: nodes.append(nd)
-			else: names.append(x)
+			if nd := root.find_resource(x):
+				if nd: nodes.append(nd)
+			else:
+				names.append(x)
 		return (nodes, names)
 
 @feature('copy_qt_binaries')
@@ -353,24 +353,25 @@ def copy_qt_binaries(self):
 	if self.env['PLATFORM'] == 'project_generator':
 		return
 
-	if not 'msvc' in (self.env.CC_NAME, self.env.CXX_NAME) or self.env['MSVC_TARGETS'][0] != 'x64':
+	if ('msvc' not in (self.env.CC_NAME, self.env.CXX_NAME)
+	    or self.env['MSVC_TARGETS'][0] != 'x64'):
 		return
-		
+
 	if hasattr(self.env['CONFIG_OVERWRITES'], self.target):
 		configuration = self.env['CONFIG_OVERWRITES'][self.target]
 	else:
 		configuration =  self.env['CONFIGURATION']
-	
+
 	bld	= self.bld
 	platform	= bld.env['PLATFORM']
 	output_folder = bld.get_output_folders(platform, configuration)[0]
 	qt_root_path = get_qt_root_path(self)
 	qt_root_node = bld.root.make_node(qt_root_path)
-	
+
 	# Copy qt plugins	
 	debug_postfix = 'd' if configuration == 'debug' else ''
 	for qt_plugin in qt_plugins.keys():
-		qt_plugin_node = qt_root_node.make_node('/plugins/' + qt_plugin)		
+		qt_plugin_node = qt_root_node.make_node(f'/plugins/{qt_plugin}')
 		output_folder_plugin = output_folder.make_node(qt_plugin)
 		for plugin_name in qt_plugins[qt_plugin]:
 			file = plugin_name + debug_postfix + '.dll'
@@ -382,20 +383,20 @@ def copy_qt_binaries(self):
 	# Copy QT core binaries	
 	(defines, includes, libpath, libs, binaries) = collect_qt_properties(self)
 	qt_binaries = libs + binaries
-	
+
 	qt_bin_node = qt_root_node.make_node('bin')
 	for file_name in os.listdir(qt_bin_node.abspath()):
 		file_base, file_exension = os.path.splitext(file_name)
-		
+
 		# Special case qt icu binaries which carry version number in name
 		# e.g. icutest53.dll
 		# Note: we can't just strip the last few characters since there may be a 'd' affix for debug libraries
 		if file_base.startswith('icu'):
 			file_base = ''.join(c for c in file_base if not c.isdigit())
 
-		pdb_name = file_base + '.pdb'
+		pdb_name = f'{file_base}.pdb'
 		pdb_path = os.path.join(qt_root_path, 'bin', pdb_name)
-			
+
 		# Copy binaries
 		if file_base in qt_binaries:
 			self.create_task('copy_outputs', qt_bin_node.make_node(file_name), output_folder.make_node(file_name))
@@ -406,11 +407,12 @@ def copy_qt_binaries(self):
 ############ DEPRECATED ############
 @extension('.ui')
 def create_uic_task(self, node):
-	if not self.env['PLATFORM'] == 'project_generator':				
-		Logs.warn('[WARNING] QT .ui files are deprecated. Please replace: ' + node.name)
-		
+	if self.env['PLATFORM'] != 'project_generator':			
+		Logs.warn(
+		    f'[WARNING] QT .ui files are deprecated. Please replace: {node.name}')
+
 	uictask = self.create_task('ui4', node)
-	uictask.outputs = [self.path.find_or_declare('ui_%s.h' % node.name[:-3])]
+	uictask.outputs = [self.path.find_or_declare(f'ui_{node.name[:-3]}.h')]
 	uictask.env.append_value( 'QT_UIC', os.path.join(get_qt_root_path(self), 'bin', 'uic.exe') )
 	
 	

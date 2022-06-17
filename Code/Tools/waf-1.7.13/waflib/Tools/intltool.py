@@ -60,7 +60,7 @@ def apply_intltool_in_f(self):
 	except ValueError: pass
 
 	if not self.env.LOCALEDIR:
-		self.env.LOCALEDIR = self.env.PREFIX + '/share/locale'
+		self.env.LOCALEDIR = f'{self.env.PREFIX}/share/locale'
 
 	for i in self.to_list(self.source):
 		node = self.path.find_resource(i)
@@ -77,8 +77,7 @@ def apply_intltool_in_f(self):
 		self.env['INTLFLAGS'] = getattr(self, 'flags', ['-q', '-u', '-c'])
 
 		task = self.create_task('intltool', node, node.change_ext(''))
-		inst = getattr(self, 'install_path', '${LOCALEDIR}')
-		if inst:
+		if inst := getattr(self, 'install_path', '${LOCALEDIR}'):
 			self.bld.install_files(inst, task.outputs)
 
 @feature('intltool_po')
@@ -104,34 +103,31 @@ def apply_intltool_po(self):
 	except ValueError: pass
 
 	if not self.env.LOCALEDIR:
-		self.env.LOCALEDIR = self.env.PREFIX + '/share/locale'
+		self.env.LOCALEDIR = f'{self.env.PREFIX}/share/locale'
 
 	appname = getattr(self, 'appname', 'set_your_app_name')
 	podir = getattr(self, 'podir', '')
 	inst = getattr(self, 'install_path', '${LOCALEDIR}')
 
-	linguas = self.path.find_node(os.path.join(podir, 'LINGUAS'))
-	if linguas:
-		# scan LINGUAS file for locales to process
-		file = open(linguas.abspath())
-		langs = []
-		for line in file.readlines():
-			# ignore lines containing comments
-			if not line.startswith('#'):
-				langs += line.split()
-		file.close()
+	if linguas := self.path.find_node(os.path.join(podir, 'LINGUAS')):
+		with open(linguas.abspath()) as file:
+			langs = []
+			for line in file.readlines():
+				# ignore lines containing comments
+				if not line.startswith('#'):
+					langs += line.split()
 		re_linguas = re.compile('[-a-zA-Z_@.]+')
 		for lang in langs:
 			# Make sure that we only process lines which contain locales
-			if re_linguas.match(lang):
-				node = self.path.find_resource(os.path.join(podir, re_linguas.match(lang).group() + '.po'))
+			if re_linguas.match(lang) and inst:
+				node = self.path.find_resource(
+				    os.path.join(podir, f'{re_linguas.match(lang).group()}.po'))
 				task = self.create_task('po', node, node.change_ext('.mo'))
 
-				if inst:
-					filename = task.outputs[0].name
-					(langname, ext) = os.path.splitext(filename)
-					inst_file = inst + os.sep + langname + os.sep + 'LC_MESSAGES' + os.sep + appname + '.mo'
-					self.bld.install_as(inst_file, task.outputs[0], chmod=getattr(self, 'chmod', Utils.O644), env=task.env)
+				filename = task.outputs[0].name
+				(langname, ext) = os.path.splitext(filename)
+				inst_file = inst + os.sep + langname + os.sep + 'LC_MESSAGES' + os.sep + appname + '.mo'
+				self.bld.install_as(inst_file, task.outputs[0], chmod=getattr(self, 'chmod', Utils.O644), env=task.env)
 
 	else:
 		Logs.pprint('RED', "Error no LINGUAS file found in po directory")

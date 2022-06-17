@@ -116,23 +116,23 @@ class store_context(type):
 	Metaclass for storing the command classes into the list :py:const:`waflib.Context.classes`
 	Context classes must provide an attribute 'cmd' representing the command to execute
 	"""
-	def __init__(cls, name, bases, dict):
-		super(store_context, cls).__init__(name, bases, dict)
-		name = cls.__name__
+	def __init__(self, name, bases, dict):
+		super(store_context, self).__init__(name, bases, dict)
+		name = self.__name__
 
-		if name == 'ctx' or name == 'Context':
+		if name in ['ctx', 'Context']:
 			return
 
 		try:
-			cls.cmd
+			self.cmd
 		except AttributeError:
 			raise Errors.WafError('Missing command for the context class %r (cmd)' % name)
 
-		if not getattr(cls, 'fun', None):
-			cls.fun = cls.cmd
+		if not getattr(self, 'fun', None):
+			self.fun = self.cmd
 
 		global classes
-		classes.insert(0, cls)
+		classes.insert(0, self)
 
 ctx = store_context('ctx', (object,), {})
 """Base class for the :py:class:`waflib.Context.Context` classes"""
@@ -212,8 +212,7 @@ class Context(ctx):
 
 		for t in tools:
 			module = load_tool(t, path)
-			fun = getattr(module, kw.get('name', self.fun), None)
-			if fun:
+			if fun := getattr(module, kw.get('name', self.fun), None):
 				fun(self)
 
 	def execute(self):
@@ -293,7 +292,7 @@ class Context(ctx):
 				d = os.path.join(self.path.abspath(), d)
 
 			WSCRIPT     = os.path.join(d, WSCRIPT_FILE)
-			WSCRIPT_FUN = WSCRIPT + '_' + (name or self.fun)
+			WSCRIPT_FUN = f'{WSCRIPT}_' + ((name or self.fun))
 
 			node = self.root.find_node(WSCRIPT_FUN)
 			if node and (not once or node not in cache):
@@ -316,11 +315,12 @@ class Context(ctx):
 
 						if not user_function:
 							user_function = getattr(wscript_module, 'build', None) # Fall back to 'build' function
-							
+
 						if not user_function:
 							if not mandatory:
 								continue
-							raise Errors.WafError('No function %s defined in %s' % (name or self.fun, node.abspath()))
+							raise Errors.WafError(
+							    f'No function {name or self.fun} defined in {node.abspath()}')
 
 						self.execute_user_function( user_function, wscript_module )
 					finally:
@@ -328,7 +328,7 @@ class Context(ctx):
 				elif not node:
 					if not mandatory:
 						continue
-					raise Errors.WafError('No wscript file in directory %s' % d)
+					raise Errors.WafError(f'No wscript file in directory {d}')
 
 	def exec_command(self, cmd, **kw):
 		"""
@@ -346,16 +346,13 @@ class Context(ctx):
 		:param kw: keyword arguments for subprocess.Popen
 		"""
 		def write_output( channel, output ):
-			host = Utils.unversioned_sys_platform()	
+			host = Utils.unversioned_sys_platform()
 			for line in output.splitlines(True):
 				if host == 'win32':
 					# ensure the right line endins, else we get empty lines
-					line = line.replace('\r\n','\n') 
-					m = re.match(reg_gcc_output, line)
-					if m:
-						line = '%s:%s(%s) : %s' % (m.group(1), m.group(2), m.group(3), m.group(5))
-						pass
-
+					line = line.replace('\r\n','\n')
+					if m := re.match(reg_gcc_output, line):
+						line = f'{m[1]}:{m[2]}({m[3]}) : {m[5]}'
 				channel.write(line)
 			
 		subprocess = Utils.subprocess
@@ -449,7 +446,7 @@ class Context(ctx):
 		kw['stdout'] = kw['stderr'] = subprocess.PIPE
 		if quiet is None:
 			self.to_log(cmd)
-			
+
 		if hasattr(self, 'cmd_coordinator'):
 			(ret, out, err) = self.cmd_coordinator.execute_command(cmd, **kw)
 		else:
@@ -457,9 +454,9 @@ class Context(ctx):
 				p = subprocess.Popen(cmd, **kw)				
 				(out, err) = p.communicate()
 				ret = p.returncode
-				
+
 			except Exception as e:
-				raise Errors.WafError('Execution failure: %s' % str(e), ex=e)
+				raise Errors.WafError(f'Execution failure: {str(e)}', ex=e)
 
 		if not isinstance(out, str):
 			out = out.decode(sys.stdout.encoding or 'iso8859-1')
@@ -467,9 +464,9 @@ class Context(ctx):
 			err = err.decode(sys.stdout.encoding or 'iso8859-1')
 
 		if out and quiet != STDOUT and quiet != BOTH:
-			self.to_log('out: %s' % out)
+			self.to_log(f'out: {out}')
 		if err and quiet != STDERR and quiet != BOTH:
-			self.to_log('err: %s' % err)
+			self.to_log(f'err: {err}')
 
 		if ret:
 			e = Errors.WafError('Command %r returned %r' % (cmd, ret))
@@ -497,7 +494,7 @@ class Context(ctx):
 		:type ex: exception
 		"""
 		if self.logger:
-			self.logger.info('from %s: %s' % (self.path.abspath(), msg))		
+			self.logger.info(f'from {self.path.abspath()}: {msg}')
 		raise self.errors.ConfigurationError(msg, ex=ex)
 
 	def to_log(self, msg):
@@ -543,7 +540,7 @@ class Context(ctx):
 		self.start_msg(msg)
 
 		if not isinstance(color, str):
-			color = result and 'GREEN' or 'YELLOW'
+			color = 'GREEN' if result else 'YELLOW'
 
 		self.end_msg(result, color)
 
@@ -565,7 +562,7 @@ class Context(ctx):
 			self.line_just = max(40, len(msg))
 		#for x in (self.line_just * '-', msg):
 		#	self.to_log(x)
-		Logs.pprint('NORMAL', "%s :" % msg.ljust(self.line_just), sep='')
+		Logs.pprint('NORMAL', f"{msg.ljust(self.line_just)} :", sep='')
 
 	def end_msg(self, result, color=None):
 		"""Print the end of a 'Checking for' message. See :py:meth:`waflib.Context.Context.msg`"""
@@ -590,7 +587,7 @@ class Context(ctx):
 		global waf_dir
 		lst = self.root.find_node(waf_dir).find_node('waflib/extras').ant_glob(var)
 		for x in lst:
-			if not x.name in ban:
+			if x.name not in ban:
 				load_tool(x.name.replace('.py', ''))
 
 cache_modules = {}
@@ -662,16 +659,16 @@ def load_tool(tool, tooldir=None):
 	else:
 		global waf_dir
 		try:
-			os.stat(os.path.join(waf_dir, 'waflib', 'extras', tool + '.py'))
+			os.stat(os.path.join(waf_dir, 'waflib', 'extras', f'{tool}.py'))
 		except OSError:
 			try:
-				os.stat(os.path.join(waf_dir, 'waflib', 'Tools', tool + '.py'))
+				os.stat(os.path.join(waf_dir, 'waflib', 'Tools', f'{tool}.py'))
 			except OSError:
 				d = tool # user has messed with sys.path
 			else:
-				d = 'waflib.Tools.%s' % tool
+				d = f'waflib.Tools.{tool}'
 		else:
-			d = 'waflib.extras.%s' % tool
+			d = f'waflib.extras.{tool}'
 
 		__import__(d)
 		ret = sys.modules[d]
@@ -679,10 +676,10 @@ def load_tool(tool, tooldir=None):
 		return ret
 
 def load_branch_spec(path):
-	branch_spec_globals = {}
 	branch_spec_file = path + os.sep + "waf_branch_spec.py"
 	if os.path.isfile(branch_spec_file):
+		branch_spec_globals = {}
 		execfile(branch_spec_file, branch_spec_globals)
 		return branch_spec_globals
 	else:
-		Logs.error('Waf: Unable to locate file %s' % branch_spec_file)
+		Logs.error(f'Waf: Unable to locate file {branch_spec_file}')

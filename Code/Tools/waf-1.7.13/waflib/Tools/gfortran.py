@@ -39,8 +39,8 @@ def gfortran_modifier_darwin(conf):
 @conf
 def gfortran_modifier_platform(conf):
 	dest_os = conf.env['DEST_OS'] or Utils.unversioned_sys_platform()
-	gfortran_modifier_func = getattr(conf, 'gfortran_modifier_' + dest_os, None)
-	if gfortran_modifier_func:
+	if gfortran_modifier_func := getattr(conf, f'gfortran_modifier_{dest_os}',
+	                                     None):
 		gfortran_modifier_func()
 
 @conf

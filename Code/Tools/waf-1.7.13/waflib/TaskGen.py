@@ -75,8 +75,8 @@ class task_gen(object):
 		"""
 		List of tasks created.
 		"""
-		
-		if not 'bld' in kw:
+
+		if 'bld' not in kw:
 			# task generators without a build context :-/
 			self.env = ConfigSet.ConfigSet()
 			self.idx = 0
@@ -85,7 +85,7 @@ class task_gen(object):
 			self.bld = kw['bld']
 			self.env = self.bld.env.derive()
 			self.path = self.bld.path # emulate chdir when reading scripts
-						
+
 		for key, val in kw.items():
 			setattr(self, key, val)
 
@@ -95,11 +95,11 @@ class task_gen(object):
 
 	def __repr__(self):
 		"""for debugging purposes"""
-		lst = []
-		for x in self.__dict__.keys():
-			if x not in ['env', 'bld', 'compiled_tasks', 'tasks']:
-				lst.append("%s=%s" % (x, repr(getattr(self, x))))
-		return "bld(%s) in %s" % (", ".join(lst), self.path.abspath())
+		lst = [
+		    f"{x}={repr(getattr(self, x))}" for x in self.__dict__.keys()
+		    if x not in ['env', 'bld', 'compiled_tasks', 'tasks']
+		]
+		return f'bld({", ".join(lst)}) in {self.path.abspath()}'
 
 	def get_name(self):
 		"""
@@ -136,8 +136,7 @@ class task_gen(object):
 		:param val: input to return as a list
 		:rtype: list
 		"""
-		if isinstance(val, str): return val.split()
-		else: return val
+		return val.split() if isinstance(val, str) else val
 
 	def post(self):
 		"""
@@ -162,18 +161,12 @@ class task_gen(object):
 		self.features = Utils.to_list(self.features)
 		for x in self.features + ['*']:
 			st = feats[x]
-			if not st:
-				if not x in Task.classes:
-					Logs.warn('feature %r does not exist - bind at least one method to it' % x)
+			if not st and x not in Task.classes:
+				Logs.warn('feature %r does not exist - bind at least one method to it' % x)
 			keys.update(list(st)) # ironpython 2.7 wants the cast to list
 
-		# copy the precedence table
-		prec = {}
 		prec_tbl = self.prec or task_gen.prec
-		for x in prec_tbl:
-			if x in keys:
-				prec[x] = prec_tbl[x]
-
+		prec = {x: prec_tbl[x] for x in prec_tbl if x in keys}
 		# elements disconnected
 		tmp = []
 		for a in keys:
@@ -196,8 +189,8 @@ class task_gen(object):
 			else:
 				del prec[e]
 				for x in nlst:
-					for y in prec:
-						if x in prec[y]:
+					for y, value in prec.items():
+						if x in value:
 							break
 					else:
 						tmp.append(x)
@@ -217,7 +210,7 @@ class task_gen(object):
 			Logs.debug('task_gen: -> %s (%d)' % (x, id(self)))
 			v()
 
-		Logs.debug('task_gen: posted %s' % self.name)
+		Logs.debug(f'task_gen: posted {self.name}')
 		return True
 
 	def get_hook(self, node):
@@ -327,23 +320,18 @@ def declare_chain(name='', rule=None, reentrant=None, color='BLUE',
 			_ext_in = ext_in[0]
 
 		tsk = self.create_task(name, node)
-		cnt = 0
-
 		keys = list(self.mappings.keys()) + list(self.__class__.mappings.keys())
-		for x in ext:
+		for cnt, x in enumerate(ext):
 			k = node.change_ext(x, ext_in=_ext_in)
 			tsk.outputs.append(k)
 
-			if reentrant != None:
-				if cnt < int(reentrant):
-					self.source.append(k)
-			else:
+			if reentrant is None:
 				for y in keys: # ~ nfile * nextensions :-/
 					if k.name.endswith(y):
 						self.source.append(k)
 						break
-			cnt += 1
-
+			elif cnt < int(reentrant):
+				self.source.append(k)
 		if install_path:
 			self.bld.install_files(install_path, tsk.outputs)
 		return tsk
@@ -413,7 +401,7 @@ def before_method(*k):
 	def deco(func):
 		setattr(task_gen, func.__name__, func)
 		for fun_name in k:
-			if not func.__name__ in task_gen.prec[fun_name]:
+			if func.__name__ not in task_gen.prec[fun_name]:
 				task_gen.prec[fun_name].append(func.__name__)
 				#task_gen.prec[fun_name].sort()
 		return func
@@ -442,7 +430,7 @@ def after_method(*k):
 	def deco(func):
 		setattr(task_gen, func.__name__, func)
 		for fun_name in k:
-			if not fun_name in task_gen.prec[func.__name__]:
+			if fun_name not in task_gen.prec[func.__name__]:
 				task_gen.prec[func.__name__].append(fun_name)
 				#task_gen.prec[func.__name__].sort()
 		return func
@@ -496,12 +484,14 @@ def to_nodes(self, lst, path=None):
 
 	# either a list or a string, convert to a list of nodes
 	for x in Utils.to_list(lst):
-		if isinstance(x, str):
-			node = find(x)
-		else:
-			node = x
-		if not node:			
-			raise Errors.WafError("(%s): source not found: %r in %r (%r)" % (self.bld.cmd, x, self.target, os.path.normpath(self.path.abspath() + '/wscript')))
+		node = find(x) if isinstance(x, str) else x
+		if not node:	
+			raise Errors.WafError("(%s): source not found: %r in %r (%r)" % (
+			    self.bld.cmd,
+			    x,
+			    self.target,
+			    os.path.normpath(f'{self.path.abspath()}/wscript'),
+			))
 		tmp.append(node)
 	return tmp
 
@@ -797,8 +787,7 @@ def process_subst(self):
 		has_constraints = False
 		tsk = self.create_task('subst', a, b)
 		for k in ('after', 'before', 'ext_in', 'ext_out'):
-			val = getattr(self, k, None)
-			if val:
+			if val := getattr(self, k, None):
 				has_constraints = True
 				setattr(tsk, k, val)
 
@@ -806,8 +795,7 @@ def process_subst(self):
 		if not has_constraints and b.name.endswith('.h'):
 			tsk.before = [k for k in ('c', 'cxx') if k in Task.classes]
 
-		inst_to = getattr(self, 'install_path', None)
-		if inst_to:
+		if inst_to := getattr(self, 'install_path', None):
 			self.bld.install_files(inst_to, b, chmod=getattr(self, 'chmod', Utils.O644))
 
 	self.source = []

@@ -414,24 +414,24 @@ def convert_waf_platform_to_vs_platform(self, platform):
 		return 'Win32'
 	if platform == 'win_x64':
 		return 'x64'
-		
+
 	if platform == 'durango':
 		return 'Durango'
 	if platform == 'orbis':
 		return 'ORBIS'
-		
+
 	if platform == 'linux_x64_gcc':
 		return 'Linux X64 GCC'
 	if platform == 'linux_x64_clang':
 		return 'Linux X64 CLANG'
-	
+
 	if platform == 'cppcheck':
 		return 'CppCheck'
-	
+
 	if platform == 'android_arm_gcc':
 		return 'Tegra-Android'
-		
-	print('to_vs error ' + platform)
+
+	print(f'to_vs error {platform}')
 	return 'UNKNOWN'
 	
 @conf
@@ -440,25 +440,25 @@ def convert_vs_platform_to_waf_platform(self, platform):
 		return 'win_x86'
 	if platform == 'x64':
 		return 'win_x64'
-	
+
 	if platform == 'Durango':
 		return 'durango'
 	if platform == 'ORBIS':
 		return 'orbis'
-		
+
 	if platform == 'Linux X64 GCC':
 		return 'linux_x64_gcc'
-	
+
 	if platform == 'Linux X64 CLANG':
 		return 'linux_x64_clang'
-	
+
 	if platform == 'CppCheck':
 		return 'cppcheck'
-		
+
 	if platform == 'Tegra-Android':
 		return 'android_arm_gcc'
-		
-	print('to_waf error ' + platform)
+
+	print(f'to_waf error {platform}')
 	return 'UNKNOWN'
 	
 @conf
@@ -480,21 +480,28 @@ def convert_vs_configuration_to_waf_configuration(self, configuration):
 @conf
 def is_valid_build_target(ctx, target, waf_spec, waf_configuration,  waf_platform):
 	bIncludeProject = True
-	
-	if not target in ctx.spec_modules(waf_spec, waf_platform, waf_configuration,):
+
+	if target not in ctx.spec_modules(
+	    waf_spec,
+	    waf_platform,
+	    waf_configuration,
+	):
 		bIncludeProject = False
-	if not waf_configuration in ctx.spec_valid_configurations(waf_spec, waf_platform, waf_configuration):
+	if waf_configuration not in ctx.spec_valid_configurations(
+	    waf_spec, waf_platform, waf_configuration):
 		bIncludeProject = False
-	if not any(i in ctx.get_platform_list(waf_platform) for i in ctx.spec_valid_platforms(waf_spec, waf_platform, waf_configuration)):
+	if all(
+	    i not in ctx.get_platform_list(waf_platform) for i in
+	    ctx.spec_valid_platforms(waf_spec, waf_platform, waf_configuration)):
 		bIncludeProject = False
-		
+
 	# For projects which are not includes, check if it is a static module which is used by another module
 	# Those are added bypassing the valid check in the waf spec
 	if not bIncludeProject and hasattr(ctx, 'cry_module_users'):
 		for user in ctx.cry_module_users.get(target, []):
 			if user in ctx.spec_modules(waf_spec, waf_platform, waf_configuration):
 				bIncludeProject = True
-		
+
 	return bIncludeProject
  
 def is_valid_spec(ctx, spec_name):
@@ -633,7 +640,7 @@ def stealth_write(self, data, flags='wb'):
 	except (IOError, ValueError):
 		self.write(data, flags=flags)
 	else:
-		Logs.debug('msvs: skipping %s' % self.abspath())
+		Logs.debug(f'msvs: skipping {self.abspath()}')
 Node.Node.stealth_write = stealth_write
 
 re_quote = re.compile("[^a-zA-Z0-9-.]")
@@ -648,14 +655,13 @@ def make_uuid(v, prefix = None):
 	simple utility function
 	"""
 	if isinstance(v, dict):
-		keys = list(v.keys())
-		keys.sort()
+		keys = sorted(v.keys())
 		tmp = str([(k, v[k]) for k in keys])
 	else:
 		tmp = str(v)
 	d = Utils.md5(tmp.encode()).hexdigest().upper()
 	if prefix:
-		d = '%s%s' % (prefix, d[8:])
+		d = f'{prefix}{d[8:]}'
 	gid = uuid.UUID(d, version = 4)
 	return str(gid).upper()
 
@@ -687,17 +693,16 @@ def diff(node, fromnode):
 		c1 = c1.parent
 		c2 = c2.parent
 
-	for i in range(up):
-		lst.append('(..)')
+	lst.extend('(..)' for _ in range(up))
 	lst.reverse()
 	return tuple(lst)
 	
 def _is_user_option_true(value):
 	""" Convert multiple user inputs to True, False or None	"""
 	value = str(value)
-	if value.lower() == 'true' or value.lower() == 't' or value.lower() == 'yes' or value.lower() == 'y' or value.lower() == '1':
+	if value.lower() in {'true', 't', 'yes', 'y', '1'}:
 		return True
-	if value.lower() == 'false' or value.lower() == 'f' or value.lower() == 'no' or value.lower() == 'n' or value.lower() == '0':
+	if value.lower() in {'false', 'f', 'no', 'n', '0'}:
 		return False
 		
 		
@@ -706,19 +711,19 @@ def _get_boolean_value(ctx, msg, value):
 	msg += ' '
 	while len(msg) < 53:
 		msg += ' '
-	msg += '['+value+']: '
-	
+	msg += f'[{value}]: '
+
 	while True:
 		user_input = raw_input(msg)
-		
+
 		# No input -> return default
 		if user_input == '':	
 			return value
-			
+
 		ret_val = _is_user_option_true(user_input)
 		if ret_val != None:
 			return ret_val
-			
+
 		Logs.warn('Unknown input "%s"\n Acceptable values (none case sensitive):' % user_input)
 		Logs.warn("True : 'true'/'t' or 'yes'/'y' or '1'")
 		Logs.warn("False: 'false'/'f' or 'no'/'n' or '0'")
@@ -737,33 +742,33 @@ def strip_unsupported_msbuild_platforms(conf):
 	VS 2013 appears to have a MSBUILD path in its vcvars path. """
 
 	ms_build_version = 'v4.0'
-		
+
 	ask_for_user_input = conf.is_option_true('ask_for_user_input')
 	console_mode = conf.is_option_true('console_mode')
 
 	# Go through cache and find a valid 'win_' configuration as we need MSVC_PATH and MSVC_VERSION
 	cur_env = get_win_env(conf)
-	
+
 	# Get MSBUILD folder
 	if conf.is_option_true('auto_detect_compiler'):
 		# Go up two folders i.e. C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC -> C:\Program Files (x86)
 		msvs_dir = os.path.dirname(cur_env['MSVC_PATH'])
-		msbuild_dir = os.path.dirname(msvs_dir) + '/MSBUILD'
+		msbuild_dir = f'{os.path.dirname(msvs_dir)}/MSBUILD'
 	else:
 		# Internally assume MSBUILD is installed here (as MSVC_PATH will point to Code/SDK)
 		msbuild_dir = 'C:/Program Files (x86)/MSBuild'
-		
+
 	# Visual Studio behave oddly when picking which "Platform" folder to use.
 	# If there is no "Platform" folder in root assume that MSBUILD uses the MSVC versioned one
 	# VS2012 Pro -> Root/Platform
 	# VS2012 Exp -> Root/<msvc_version>/Platforms
-	msbuild_base = msbuild_dir + '/Microsoft.Cpp/' + ms_build_version
-	if os.path.exists(msbuild_base + '/Platforms'):
-		msbuild_folder_path = msbuild_base + '/Platforms/'
+	msbuild_base = f'{msbuild_dir}/Microsoft.Cpp/{ms_build_version}'
+	if os.path.exists(f'{msbuild_base}/Platforms'):
+		msbuild_folder_path = f'{msbuild_base}/Platforms/'
 	else:
 		toolset = 'V' + cur_env['MSVC_VERSION'].replace('.','') # 11.0 -> v110
-		msbuild_folder_path ='%s/%s/Platforms/' % (msbuild_base, toolset)
-		
+		msbuild_folder_path = f'{msbuild_base}/{toolset}/Platforms/'
+
 	# Platform to MSBUILD folder map
 	required_folder_for_platform = { 		
 		'win_x86' : 'Win32',
@@ -775,15 +780,20 @@ def strip_unsupported_msbuild_platforms(conf):
 		}
 
 	installed_platforms = []
-	for platform in conf.get_supported_platforms():			
-		if platform in required_folder_for_platform:			
+	for platform in conf.get_supported_platforms():		
+		if platform in required_folder_for_platform:	
 			msbuild_platform_folder = msbuild_folder_path + required_folder_for_platform[platform]
-			
+
 			# If path does not exist ask user if he wants to try create it
 			if not os.path.exists(msbuild_platform_folder):
-				info_str = ['Unsupported MSBUILD platform "%s" encountered. Visual Studio will not be able to load the solution correcty.%s' % (required_folder_for_platform[platform], ('\n' if ask_for_user_input else ''))]
-				info_str.append('The following folder which is allowed to be empty, is missing from MSBUILD: %s' % msbuild_platform_folder)
-				
+				info_str = [
+				    'Unsupported MSBUILD platform "%s" encountered. Visual Studio will not be able to load the solution correcty.%s'
+				    % (
+				        required_folder_for_platform[platform],
+				        ('\n' if ask_for_user_input else ''),
+				    ),
+				    f'The following folder which is allowed to be empty, is missing from MSBUILD: {msbuild_platform_folder}',
+				]
 				if ask_for_user_input:
 					info_str.append('\nWould you like WAF to create the folder?')
 					if not console_mode: # gui	
@@ -794,23 +804,20 @@ def strip_unsupported_msbuild_platforms(conf):
 				else:
 					Logs.warn('[WARNING]: ' + '\n'.join(info_str))
 					create_folder = False
-			
+
 				if create_folder:
 					try:			
 						os.makedirs(msbuild_platform_folder)
 					except OSError as exception:
 						if exception.errno != errno.EEXIST:
 							Logs.warn('[WARNING]:Unable to create folder "%s".\nWAF might not be running with admin rights.' % (msbuild_platform_folder))				
-							
+
 				if not os.path.exists(msbuild_platform_folder):
 					Logs.warn('[WARNING] Stripped platform "%s" from Visual Studio solution as unsupported by MSBUILD. Install the platforms SDK or create the following empty folder: %s' % (required_folder_for_platform[platform],msbuild_platform_folder))
 					continue
-						
-				# Allow platform
-				installed_platforms.append(platform)
-			else:
-				# Allow platform
-				installed_platforms.append(platform)			
+
+			# Allow platform
+			installed_platforms.append(platform)
 		else:
 			# Strip platform
 			Logs.warn('[WARNING] Stripped platform "%s" from Visual Studio solution as it is not supported by WAF. Supported platforms: %s' % (required_folder_for_platform[platform], required_folder_for_platform.keys()))
@@ -829,7 +836,7 @@ def detect_nsight_tegra_vs_plugin_version(conf):
 
 	# Go through cache and find a valid 'win_' configuration as we need MSVC_PATH
 	cur_env = get_win_env(conf)
-	if cur_env is not None:	
+	if cur_env is not None:
 		msvs_dir = os.path.dirname(cur_env['MSVC_PATH'])
 		ext_dir = os.path.join(msvs_dir, 'Common7', 'IDE', 'Extensions', 'NVIDIA', 'Nsight Tegra')
 		if os.path.exists(ext_dir):
@@ -847,14 +854,10 @@ def detect_nsight_tegra_vs_plugin_version(conf):
 					# Look for the native project template file
 					temp_path = os.path.join(ext_dir, v, '~PC', 'ProjectTemplates', 'Nsight Tegra', '1033', 'Android.Native.zip', 'native.vcxproj')
 					if os.path.exists(temp_path):
-						temp_file = open(temp_path)
-						temp = temp_file.read()
-						temp_file.close()
-
-						# Search for the project revision number and return if found
-						res = format.search(temp)
-						if res:
-							conf.nsight_tegra_vs_plugin_version = res.group(1)
+						with open(temp_path) as temp_file:
+							temp = temp_file.read()
+						if res := format.search(temp):
+							conf.nsight_tegra_vs_plugin_version = res[1]
 							return
 
 
@@ -911,20 +914,20 @@ class vsnode_vsdir(vsnode):
 	def ptype(self):
 		return self.VS_GUID_SOLUTIONFOLDER
 
-def _get_filter_name(project_filter_dict, file_name):	
-		""" Helper function to get a correct project filter """
-		if file_name.endswith('wscript') or file_name.endswith('.waf_files'):
-			return '_WAF_' # Special case for wscript files			
+def _get_filter_name(project_filter_dict, file_name):
+	""" Helper function to get a correct project filter """
+	if file_name.endswith('wscript') or file_name.endswith('.waf_files'):
+		return '_WAF_' # Special case for wscript files			
 
-		if not file_name in project_filter_dict:
-			return 'FILE_NOT_FOUND'
-			
-		project_filter = project_filter_dict[file_name]		
-		project_filter = project_filter.replace('/', '\\')
-		if project_filter.lower() == 'root' or  project_filter == '':
-			return '.'
-			
-		return project_filter
+	if file_name not in project_filter_dict:
+		return 'FILE_NOT_FOUND'
+
+	project_filter = project_filter_dict[file_name]
+	project_filter = project_filter.replace('/', '\\')
+	if project_filter.lower() == 'root' or  project_filter == '':
+		return '.'
+
+	return project_filter
 			
 class vsnode_project(vsnode):
 	"""
@@ -954,9 +957,9 @@ class vsnode_project(vsnode):
 		lst = []
 		
 		def add(x):		
-			if not x.lower() == '.':
+			if x.lower() != '.':
 				lst.append(x)
-			
+
 			seperator_pos = x.rfind('\\')
 			if seperator_pos != -1:
 				add(x[:seperator_pos])
@@ -1003,7 +1006,7 @@ class vsnode_project(vsnode):
 		for c in self.ctx.configurations:
 			waf_configuration = self.ctx.convert_vs_configuration_to_waf_configuration(c)
 			waf_spec = self.ctx.convert_vs_spec_to_waf_spec(c)
-			
+
 			for p in self.ctx.platforms:
 				x = build_property()
 				x.outdir = ''
@@ -1012,18 +1015,14 @@ class vsnode_project(vsnode):
 				waf_platform = self.ctx.convert_vs_platform_to_waf_platform(p)				
 
 				active_projects = self.ctx.spec_game_projects(waf_spec, waf_platform, waf_configuration)
-				if len(active_projects) != 1:
-					x.game_project = ''
-				else:
-					x.game_project = active_projects[0]
-
+				x.game_project = '' if len(active_projects) != 1 else active_projects[0]
 				x.configuration = c
 				x.platform = p
 				x.bin_output_folder = self.ctx.get_output_folders(waf_platform, waf_configuration, waf_spec)[0]				
-				
+
 				x.preprocessor_definitions = ''
 				x.includes_search_path = ''
-				
+
 				# can specify "deploy_dir" too
 				ret.append(x)
 		self.build_properties = ret
@@ -1034,19 +1033,34 @@ class vsnode_project(vsnode):
 
 	def get_build_command(self, props):		
 		params = self.get_build_params(props)
-		return "%s build_" % params[0] + self.ctx.convert_vs_platform_to_waf_platform(props.platform) + '_' + self.ctx.convert_vs_configuration_to_waf_configuration(props.configuration) + ' --project-spec ' + self.ctx.convert_vs_spec_to_waf_spec(props.configuration) + " %s" % params[1]		
+		return (f"{params[0]} build_" + self.ctx.convert_vs_platform_to_waf_platform(
+		    props.platform) + '_' +
+		        self.ctx.convert_vs_configuration_to_waf_configuration(
+		            props.configuration) + ' --project-spec ' +
+		        self.ctx.convert_vs_spec_to_waf_spec(
+		            props.configuration) + f" {params[1]}")		
 
 	def get_clean_command(self, props):
 		params = self.get_build_params(props)
-		return "%s clean_" % params[0] + self.ctx.convert_vs_platform_to_waf_platform(props.platform) + '_' + self.ctx.convert_vs_configuration_to_waf_configuration(props.configuration) + ' --project-spec ' + self.ctx.convert_vs_spec_to_waf_spec(props.configuration) + " %s" % params[1]		
+		return (f"{params[0]} clean_" + self.ctx.convert_vs_platform_to_waf_platform(
+		    props.platform) + '_' +
+		        self.ctx.convert_vs_configuration_to_waf_configuration(
+		            props.configuration) + ' --project-spec ' +
+		        self.ctx.convert_vs_spec_to_waf_spec(
+		            props.configuration) + f" {params[1]}")		
 		
 	def get_rebuild_command(self, props):			
 		params = self.get_build_params(props)
-		return 	"%s" % params[0] + \
-				" clean_" + self.ctx.convert_vs_platform_to_waf_platform(props.platform) + '_' + self.ctx.convert_vs_configuration_to_waf_configuration(props.configuration) + \
-				" build_" + self.ctx.convert_vs_platform_to_waf_platform(props.platform) + '_' + self.ctx.convert_vs_configuration_to_waf_configuration(props.configuration) + \
-				' --project-spec ' + self.ctx.convert_vs_spec_to_waf_spec(props.configuration) +\
-				" %s" % params[1]		
+		return (
+		    (((((f"{params[0]}" + " clean_") +
+		        self.ctx.convert_vs_platform_to_waf_platform(props.platform) + '_') +
+		       self.ctx.convert_vs_configuration_to_waf_configuration(
+		           props.configuration) + " build_") +
+		      self.ctx.convert_vs_platform_to_waf_platform(props.platform) + '_') +
+		     self.ctx.convert_vs_configuration_to_waf_configuration(
+		         props.configuration) + ' --project-spec ') +
+		    self.ctx.convert_vs_spec_to_waf_spec(
+		        props.configuration) + f" {params[1]}")		
 
 	def get_filter_name(self, node):
 		return _get_filter_name(self.project_filter, node.abspath())
@@ -1064,17 +1078,18 @@ class vsnode_alias(vsnode_project):
 	def __init__(self, ctx, node, name):
 		vsnode_project.__init__(self, ctx, node)
 		self.name = name
-		self.output_file = ''		
+		self.output_file = ''
 		self.project_filter = {}
-		
+
 		tools_version_lookup = { '11.0': '4.0', '12.0': '12.0', '14.0': '14.0' }
 		max_msvc_version = 0
 		for env in self.ctx.all_envs.values():
 			msvc_version = getattr(env, 'MSVC_VERSION', '')
-			if isinstance(msvc_version, basestring) and msvc_version in tools_version_lookup:
-				if float(msvc_version) > max_msvc_version:
-					max_msvc_version = float(msvc_version)
-					self.vstoolsver = tools_version_lookup[msvc_version]
+			if (isinstance(msvc_version, basestring)
+			    and msvc_version in tools_version_lookup
+			    and float(msvc_version) > max_msvc_version):
+				max_msvc_version = float(msvc_version)
+				self.vstoolsver = tools_version_lookup[msvc_version]
 
 class vsnode_build_all(vsnode_alias):
 	"""
@@ -1094,7 +1109,7 @@ class vsnode_build_all(vsnode_alias):
 		for x in self.build_properties:
 			x.outdir = self.path.parent.abspath()
 			x.preprocessor_definitions = ''
-			x.includes_search_path = ''	
+			x.includes_search_path = ''
 			x.c_flags = ''
 			x.cxx_flags = ''
 			x.link_flags = ''
@@ -1107,57 +1122,56 @@ class vsnode_build_all(vsnode_alias):
 			waf_spec = self.ctx.convert_vs_spec_to_waf_spec(x.configuration)
 			waf_platform = self.ctx.convert_vs_platform_to_waf_platform(x.platform)
 			waf_configuration = self.ctx.convert_vs_configuration_to_waf_configuration(x.configuration)	
-			
-			current_env = self.ctx.all_envs[waf_platform + '_' + waf_configuration]
+
+			current_env = self.ctx.all_envs[f'{waf_platform}_{waf_configuration}']
 			x.platform_toolset = 'v' + str(current_env['MSVC_VERSION']).replace('.','') if current_env['MSVC_VERSION'] else ""
-						
+
 			x.target_spec = waf_spec
-			x.target_config = waf_platform + '_' + waf_configuration
-			
+			x.target_config = f'{waf_platform}_{waf_configuration}'
+
 		# Collect WAF files
 		waf_data_dir 			= self.ctx.root.make_node(Context.launch_dir).make_node('_WAF_')
 		waf_source_dir		= self.ctx.root.make_node(Context.launch_dir).make_node('Code/Tools/waf-1.7.13')
-		
-		waf_config_files	= waf_data_dir.ant_glob('**/*', maxdepth=0)		
+
+		waf_config_files	= waf_data_dir.ant_glob('**/*', maxdepth=0)
 		waf_spec_files 		= waf_data_dir.make_node('specs').ant_glob('**/*')	
-		
+
 		waf_scripts					= waf_source_dir.make_node('waflib').ant_glob('**/*.py')
 		waf_crytek_scripts	= waf_source_dir.make_node('crywaflib').ant_glob('**/*.py')				
-		
+
 		# Remove files found in crywaflib from waf scripts
 		tmp = []
-		waf_crytek_scripts_files = []
-		for node in waf_crytek_scripts:
-			waf_crytek_scripts_files += [os.path.basename(node.abspath())]
-			
+		waf_crytek_scripts_files = [
+		    os.path.basename(node.abspath()) for node in waf_crytek_scripts
+		]
 		for x in waf_scripts:
 			if os.path.basename(x.abspath()) in waf_crytek_scripts_files:
 				continue
 			tmp += [x]
 		waf_scripts = tmp	
-		
+
 		for file in waf_config_files:
 			self.project_filter[file.abspath()] = 'Settings'
 		for file in waf_spec_files:
 			self.project_filter[file.abspath()] = 'Specs'
-		
+
 		for file in waf_scripts:
 			filter_name = 'Scripts'
-			subdir = os.path.dirname( file.path_from( waf_source_dir.make_node('waflib') ) )			
+			subdir = os.path.dirname( file.path_from( waf_source_dir.make_node('waflib') ) )
 			if subdir != '':
-				filter_name += '/' + subdir
+				filter_name += f'/{subdir}'
 			self.project_filter[file.abspath()] = filter_name
-			
+
 		for file in waf_crytek_scripts:
 			self.project_filter[file.abspath()] = 'Crytek Scripts'	
-			
+
 		self.source += waf_config_files + waf_spec_files + waf_scripts + waf_crytek_scripts
-		
+
 		# without a cpp file, VS wont compile this project
 		dummy_node = self.ctx.get_bintemp_folder_node().make_node('__waf_compile_dummy__.cpp')
 		self.project_filter[dummy_node.abspath()] = 'DummyCompileNode'
 		self.source += [ dummy_node ]
-	
+
 		# Waf commands		
 		self.exec_waf_command = [
 		('show_gui', 'utilities'),
@@ -1165,9 +1179,10 @@ class vsnode_build_all(vsnode_alias):
 		('generate_uber_files', 'generate_uber_files'),
 		('generate_solution', 'msvs')
 		]
-		
+
 		for command in self.exec_waf_command:
-			executable_command = self.ctx.get_bintemp_folder_node().make_node('_waf_' + command[0] + '_.cpp')
+			executable_command = self.ctx.get_bintemp_folder_node().make_node(
+			    f'_waf_{command[0]}_.cpp')
 			self.project_filter[executable_command.abspath()] = '_WAF Commands'
 			self.waf_command_override_files += [ executable_command ]
 
@@ -1233,27 +1248,18 @@ class vsnode_target(vsnode_alias):
 		vsnode_alias.__init__(self, ctx, node, quote(tg.name))
 		self.tg     = tg  # task generator
 		if getattr(tg, 'need_deploy', None):
-			if not isinstance(tg.need_deploy, list):
-				self.is_deploy = [ tg.need_deploy ]
-			else:
-				self.is_deploy = tg.need_deploy
+			self.is_deploy = (tg.need_deploy
+			                  if isinstance(tg.need_deploy, list) else [tg.need_deploy])
 		self.project_filter = self.tg.project_filter
 		
 	def is_android_project(self):
-		for feature in self.tg.features:
-			if 'android' in feature:
-				return True
-		return False
+		return any('android' in feature for feature in self.tg.features)
 		
 	def get_project_type(self):			
-		if self.is_android_project():
-			return 'ExternalBuildSystem'
-		return 'Makefile'
+		return 'ExternalBuildSystem' if self.is_android_project() else 'Makefile'
 	
 	def get_project_keyword(self):
-		if self.is_android_project():
-			return 'ExternalBuildSystem'
-		return 'MakeFileProj'
+		return 'ExternalBuildSystem' if self.is_android_project() else 'MakeFileProj'
 	
 	def get_build_params(self, props):
 		"""
@@ -1261,7 +1267,7 @@ class vsnode_target(vsnode_alias):
 		"""
 		opt = '--execsolution="%s"' % self.ctx.get_solution_node().abspath()
 		if getattr(self, 'tg', None):
-			opt += " --targets=%s" % self.tg.name
+			opt += f" --targets={self.tg.name}"
 		return (self.get_waf(), opt)
 
 	def collect_source(self):
@@ -1269,7 +1275,7 @@ class vsnode_target(vsnode_alias):
 		source_files = tg.to_nodes(getattr(tg, 'source', []))
 		include_dirs = Utils.to_list(getattr(tg, 'msvs_includes', []))
 		waf_file_entries = self.tg.waf_file_entries;
-		
+
 		include_files = []
 		""""
 		for x in include_dirs:
@@ -1305,25 +1311,30 @@ class vsnode_target(vsnode_alias):
 		"""		
 		
 		result = []
-		platforms = [target_platform]		
+		platforms = [target_platform]
 		# Append common win platform for windows hosts
-		if target_platform == 'win_x86' or target_platform == 'win_x64':
+		if target_platform in ['win_x86', 'win_x64']:
 			platforms.append('win')
-		if target_platform == 'linux_x86_gcc' or target_platform == 'linux_x64_gcc' or target_platform == 'linux_x86_clang' or target_platform == 'linux_x64_clang':
+		if target_platform in [
+		    'linux_x86_gcc',
+		    'linux_x64_gcc',
+		    'linux_x86_clang',
+		    'linux_x64_clang',
+		]:
 			platforms.append('linux')
-		if target_platform == 'linux_x86_gcc' or target_platform == 'linux_x86_clang':
+		if target_platform in ['linux_x86_gcc', 'linux_x86_clang']:
 			platforms.append('linux_x86')
-		if target_platform == 'linux_x64_gcc' or target_platform == 'linux_x64_clang':
+		if target_platform in ['linux_x64_gcc', 'linux_x64_clang']:
 			platforms.append('linux_x64')
-		if target_platform == 'darwin_x86' or target_platform == 'darwin_x64':
+		if target_platform in ['darwin_x86', 'darwin_x64']:
 			platforms.append('darwin')	
-					
+
 		settings_dict = self.ConvertToDict(settings)
-				
+
 		if not settings_dict:
 			Logs.error("[ERROR]: Unsupported type '%s' for 'settings' variable encountered." % type(settings))
 			return
-					
+
 		# add non platform specific settings
 		try:	
 			if isinstance(settings_dict[entry],list):
@@ -1332,9 +1343,9 @@ class vsnode_target(vsnode_alias):
 			  result += [settings_dict[entry]]
 		except:
 			pass		
-		
-		# add per configuration flags	
-		configuration_specific_name = ( target_configuration + '_' + entry )
+
+		# add per configuration flags
+		configuration_specific_name = f'{target_configuration}_{entry}'
 		try:	
 			if isinstance(settings_dict[configuration_specific_name],list):
 				result += settings_dict[configuration_specific_name]
@@ -1342,10 +1353,10 @@ class vsnode_target(vsnode_alias):
 			  result += [settings_dict[configuration_specific_name]]
 		except:
 			pass
-			
-		# add per platform flags	
+
+		# add per platform flags
 		for platform in platforms:
-			platform_specific_name = (platform + '_' + entry)					
+			platform_specific_name = f'{platform}_{entry}'
 			try:	
 				if isinstance(settings_dict[platform_specific_name],list):
 					result += settings_dict[platform_specific_name]
@@ -1353,10 +1364,11 @@ class vsnode_target(vsnode_alias):
 					result += [settings_dict[platform_specific_name]]
 			except:
 				pass
-				
-		# add per platform_configuration flags	
+
+		# add per platform_configuration flags
 		for platform in platforms:
-			platform_configuration_specific_name = (platform + '_' + target_configuration + '_' + entry)
+			platform_configuration_specific_name = (
+			    f'{platform}_{target_configuration}' + '_' + entry)
 			try:	
 				if isinstance(settings_dict[platform_configuration_specific_name],list):
 					result += settings_dict[platform_configuration_specific_name]
@@ -1364,7 +1376,7 @@ class vsnode_target(vsnode_alias):
 					result += [settings_dict[platform_configuration_specific_name]]
 			except:
 				pass					
-	
+
 		return result		
 	
 	def collect_properties(self):
@@ -1514,7 +1526,7 @@ class msvs_generator(BuildContext):
 
 		# Detect the most recent nsight tegra version installed if any
 		detect_nsight_tegra_vs_plugin_version(self)		
-		
+
 		if not getattr(self, 'configurations', None):
 			build_configurations = self.get_supported_configurations()
 			self.configurations = []
@@ -1524,13 +1536,14 @@ class msvs_generator(BuildContext):
 				for conf in build_configurations:
 					if not is_valid_configuration(self ,spec, conf):
 						continue
-					solution_conf_name = '[' + self.convert_waf_spec_to_vs_spec(spec) + '] ' + conf
+					solution_conf_name = f'[{self.convert_waf_spec_to_vs_spec(spec)}] {conf}'
 					solution_conf_name_vs = self.convert_waf_configuration_to_vs_configuration( solution_conf_name )
-					self.configurations.append(solution_conf_name_vs)			
+					self.configurations.append(solution_conf_name_vs)
 		if not getattr(self, 'platforms', None):
-			self.platforms = []
-			for platform in self.get_supported_platforms():
-				self.platforms.append(self.convert_waf_platform_to_vs_platform(platform))
+			self.platforms = [
+			    self.convert_waf_platform_to_vs_platform(platform)
+			    for platform in self.get_supported_platforms()
+			]
 		if not getattr(self, 'all_projects', None):
 			self.all_projects = []
 		if not getattr(self, 'project_extension', None):
@@ -1560,10 +1573,10 @@ class msvs_generator(BuildContext):
 		max_msvc_version = 0
 		for env in self.all_envs.values():
 			msvc_version = getattr(env, 'MSVC_VERSION', '')
-			if isinstance(msvc_version, basestring) and msvc_version in version_lookup:
-				if float(msvc_version) > max_msvc_version:
-					max_msvc_version = float(msvc_version)
-					self.vsver = version_lookup[msvc_version]
+			if (isinstance(msvc_version, basestring) and msvc_version in version_lookup
+			    and float(msvc_version) > max_msvc_version):
+				max_msvc_version = float(msvc_version)
+				self.vsver = version_lookup[msvc_version]
 
 	def execute(self):
 		"""
@@ -1650,8 +1663,7 @@ class msvs_generator(BuildContext):
 		"""
 		ret = []
 		for c in self.configurations:
-			for p in self.platforms:
-				ret.append((c, p))
+			ret.extend((c, p) for p in self.platforms)
 		return ret
 
 	def collect_targets(self):
@@ -1664,17 +1676,13 @@ class msvs_generator(BuildContext):
 				
 				if not isinstance(tg, TaskGen.task_gen):
 					continue
-				
-				# only include projects which are valid for any spec which we have
-				if self.options.specs_to_include_in_project_generation != '':			
-					bSkipModule = True
-					allowed_specs = self.options.specs_to_include_in_project_generation.replace(' ', '').split(',')
-					for spec_name in allowed_specs:
 
-						if tg.target in self.spec_modules(spec_name):
-							bSkipModule = False
-							break
-							
+				# only include projects which are valid for any spec which we have
+				if self.options.specs_to_include_in_project_generation != '':
+					allowed_specs = self.options.specs_to_include_in_project_generation.replace(' ', '').split(',')
+					bSkipModule = all(
+					    tg.target not in self.spec_modules(spec_name)
+					    for spec_name in allowed_specs)
 					if bSkipModule:
 						continue
 
@@ -1694,9 +1702,9 @@ class msvs_generator(BuildContext):
 		"""
 		base = getattr(self, 'projects_dir', None) or self.tg.path
 
-		node_project = base.make_node('_WAF_' + self.project_extension) # Node.		
+		node_project = base.make_node(f'_WAF_{self.project_extension}')
 		p_build = self.vsnode_build_all(self, node_project)
-		p_build.collect_properties()		
+		p_build.collect_properties()
 		self.all_projects.append(p_build)
 
 

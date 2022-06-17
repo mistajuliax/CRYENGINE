@@ -93,10 +93,15 @@ def options(opt):
 	possible_compiler_list = cxx_compiler[build_platform in cxx_compiler and build_platform or 'default']
 	test_for_compiler = ' '.join(possible_compiler_list)
 	cxx_compiler_opts = opt.add_option_group('C++ Compiler Options')
-	cxx_compiler_opts.add_option('--check-cxx-compiler', default="%s" % test_for_compiler,
-		help='On this platform (%s) the following C++ Compiler will be checked by default: "%s"' % (build_platform, test_for_compiler),
-		dest="check_cxx_compiler")
+	cxx_compiler_opts.add_option(
+	    '--check-cxx-compiler',
+	    default=f"{test_for_compiler}",
+	    help=
+	    'On this platform (%s) the following C++ Compiler will be checked by default: "%s"'
+	    % (build_platform, test_for_compiler),
+	    dest="check_cxx_compiler",
+	)
 
 	for x in test_for_compiler.split():
-		opt.load('%s' % x)
+		opt.load(f'{x}')
 

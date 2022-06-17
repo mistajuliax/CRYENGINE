@@ -11,6 +11,7 @@ as well as custom ones, used by the ``options`` wscript function.
 
 """
 
+
 import os, tempfile, optparse, sys, re
 from waflib import Logs, Utils, Context
 
@@ -35,7 +36,7 @@ commands = []
 List of commands to execute extracted from the command-line. This list is consumed during the execution, see :py:func:`waflib.Scripting.run_commands`.
 """
 
-lockfile = os.environ.get('WAFLOCK', '.lock-waf_%s_build' % sys.platform)
+lockfile = os.environ.get('WAFLOCK', f'.lock-waf_{sys.platform}_build')
 try: cache_global = os.path.abspath(os.environ['WAFCACHE'])
 except KeyError: cache_global = ''
 platform = Utils.unversioned_sys_platform()
@@ -46,7 +47,11 @@ class opt_parser(optparse.OptionParser):
 	Command-line options parser.
 	"""
 	def __init__(self, ctx):
-		optparse.OptionParser.__init__(self, conflict_handler="resolve", version='waf %s (%s)' % (Context.WAFVERSION, Context.WAFREVISION))
+		optparse.OptionParser.__init__(
+		    self,
+		    conflict_handler="resolve",
+		    version=f'waf {Context.WAFVERSION} ({Context.WAFREVISION})',
+		)
 
 		self.formatter.width = Logs.get_term_cols()
 		p = self.add_option
@@ -70,9 +75,9 @@ class opt_parser(optparse.OptionParser):
 			if platform == 'win32':
 				d = tempfile.gettempdir()
 				default_prefix = d[0].upper() + d[1:]
-				# win32 preserves the case, but gettempdir does not
 			else:
 				default_prefix = '/usr/local/'
+					# win32 preserves the case, but gettempdir does not
 		gr.add_option('--prefix', dest='prefix', default=default_prefix, help='installation prefix [default: %r]' % default_prefix)
 		gr.add_option('--download', dest='download', default=False, action='store_true', help='try to download the tools if missing')
 
@@ -112,15 +117,15 @@ class opt_parser(optparse.OptionParser):
 				if k in ['options', 'init', 'shutdown']:
 					continue
 
-				if type(v) is type(Context.create_context):
-					if v.__doc__ and not k.startswith('_'):
-						cmds_str[k] = v.__doc__
+				if (type(v) is type(Context.create_context) and v.__doc__
+				    and not k.startswith('_')):
+					cmds_str[k] = v.__doc__
 
 		just = 0
 		for k in cmds_str:
 			just = max(just, len(k))
 
-		lst = ['  %s: %s' % (k.ljust(just), v) for (k, v) in cmds_str.items()]
+		lst = [f'  {k.ljust(just)}: {v}' for (k, v) in cmds_str.items()]
 		lst.sort()
 		ret = '\n'.join(lst)
 		return '''waf [commands] [options]
@@ -221,10 +226,10 @@ class OptionsContext(Context.Context):
 		try:
 			return self.option_groups[opt_str]
 		except KeyError:
-			for group in self.parser.option_groups:
-				if group.title == opt_str:
-					return group
-			return None
+			return next(
+			    (group for group in self.parser.option_groups if group.title == opt_str),
+			    None,
+			)
 
 	def parse_args(self, _args=None):
 		"""

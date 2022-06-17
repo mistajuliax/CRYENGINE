@@ -21,8 +21,8 @@ from waflib import Task, Utils
 @extension('.lua')
 def add_lua(self, node):
 	tsk = self.create_task('luac', node, node.change_ext('.luac'))
-	inst_to = getattr(self, 'install_path', self.env.LUADIR and '${LUADIR}' or None)
-	if inst_to:
+	if inst_to := getattr(self, 'install_path', self.env.LUADIR and '${LUADIR}'
+	                      or None):
 		self.bld.install_files(inst_to, tsk.outputs)
 	return tsk
 

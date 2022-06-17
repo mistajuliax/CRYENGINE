@@ -24,6 +24,7 @@ It only works with gcc >= 4.4 though.
 
 A dumb preprocessor is also available in the tool *c_dumbpreproc*
 """
+
 # TODO: more varargs, pragma once
 
 import re, string, traceback
@@ -42,10 +43,7 @@ recursion_limit = 150
 go_absolute = False
 "Set to True to track headers on files in /usr/include, else absolute paths are ignored (but it becomes very slow)"
 
-standard_includes = ['/usr/include']
-if Utils.is_win32:
-	standard_includes = []
-
+standard_includes = [] if Utils.is_win32 else ['/usr/include']
 use_trigraphs = 0
 """Apply trigraph rules (False by default)"""
 
@@ -87,7 +85,7 @@ re_nl = re.compile('\\\\\r*\n', re.MULTILINE)
 re_cpp = re.compile(r'//.*?$|/\*.*?\*/|\'(?:\\.|[^\\\'])*\'|"(?:\\.|[^\\"])*"', re.DOTALL | re.MULTILINE )
 """Filter C/C++ comments"""
 
-trig_def = [('??'+a, b) for a, b in zip("=-/!'()<>", r'#~\|^[]{}')]
+trig_def = [(f'??{a}', b) for a, b in zip("=-/!'()<>", r'#~\|^[]{}')]
 """Trigraph definitions"""
 
 chr_esc = {'0':0, 'a':7, 'b':8, 't':9, 'n':10, 'f':11, 'v':12, 'r':13, '\\':92, "'":39}
@@ -119,7 +117,11 @@ exp_types = [
 ]
 """Expression types"""
 
-re_clexer = re.compile('|'.join(["(?P<%s>%s)" % (name, part) for name, part in zip(tok_types, exp_types)]), re.M)
+re_clexer = re.compile(
+    '|'.join(
+        [f"(?P<{name}>{part})" for name, part in zip(tok_types, exp_types)]),
+    re.M,
+)
 """Match expressions into tokens"""
 
 accepted  = 'a'
@@ -205,27 +207,44 @@ def reduce_nums(val_1, val_2, val_op):
 	except TypeError: b = int(val_2)
 
 	d = val_op
-	if d == '%':  c = a%b
-	elif d=='+':  c = a+b
-	elif d=='-':  c = a-b
-	elif d=='*':  c = a*b
-	elif d=='/':  c = a/b
-	elif d=='^':  c = a^b
-	elif d=='|':  c = a|b
-	elif d=='||': c = int(a or b)
-	elif d=='&':  c = a&b
-	elif d=='&&': c = int(a and b)
-	elif d=='==': c = int(a == b)
-	elif d=='!=': c = int(a != b)
-	elif d=='<=': c = int(a <= b)
-	elif d=='<':  c = int(a < b)
-	elif d=='>':  c = int(a > b)
-	elif d=='>=': c = int(a >= b)
-	elif d=='^':  c = int(a^b)
-	elif d=='<<': c = a<<b
-	elif d=='>>': c = a>>b
-	else: c = 0
-	return c
+	if d == '!=':
+		return int(a != b)
+	elif d == '%':
+		return a%b
+	elif d == '&&':
+		return int(a and b)
+	elif d == '&':
+		return a&b
+	elif d == '*':
+		return a*b
+	elif d == '+':
+		return a+b
+	elif d == '-':
+		return a-b
+	elif d == '/':
+		return a/b
+	elif d == '<':
+		return int(a < b)
+	elif d == '<<':
+		return a<<b
+	elif d == '<=':
+		return int(a <= b)
+	elif d == '==':
+		return int(a == b)
+	elif d == '>':
+		return int(a > b)
+	elif d == '>=':
+		return int(a >= b)
+	elif d == '>>':
+		return a>>b
+	elif d == '^':
+		return a^b
+	elif d == '|':
+		return a|b
+	elif d == '||':
+		return int(a or b)
+	else:
+		return 0
 
 def get_num(lst):
 	"""
@@ -319,11 +338,7 @@ def get_term(lst):
 			else:
 				raise PreprocError("rparen expected %r" % lst)
 
-			if int(num):
-				return get_term(lst[1:i])
-			else:
-				return get_term(lst[i+1:])
-
+			return get_term(lst[1:i]) if int(num) else get_term(lst[i+1:])
 		else:
 			num2, lst = get_num(lst[1:])
 
@@ -387,7 +402,7 @@ def paste_tokens(t1, t2):
 	p1 = None
 	if t1[0] == OP and t2[0] == OP:
 		p1 = OP
-	elif t1[0] == IDENT and (t2[0] == IDENT or t2[0] == NUM):
+	elif t1[0] == IDENT and t2[0] in [IDENT, NUM]:
 		p1 = IDENT
 	elif t1[0] == NUM and t2[0] == NUM:
 		p1 = NUM

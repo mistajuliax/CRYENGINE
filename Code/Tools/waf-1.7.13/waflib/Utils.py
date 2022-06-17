@@ -132,7 +132,7 @@ def readf(fname, m='r', encoding='ISO8859-1'):
 	:return: Content of the file
 	"""
 
-	if sys.hexversion > 0x3000000 and not 'b' in m:
+	if sys.hexversion > 0x3000000 and 'b' not in m:
 		m += 'b'
 		f = open(fname, m)
 		try:
@@ -168,7 +168,7 @@ def writef(fname, data, m='w', encoding='ISO8859-1'):
 	:type encoding: string
 	:param encoding: encoding value, only used for python 3
 	"""
-	if sys.hexversion > 0x3000000 and not 'b' in m:
+	if sys.hexversion > 0x3000000 and 'b' not in m:
 		data = data.encode(encoding)
 		m += 'b'
 	f = open(fname, m)
@@ -230,7 +230,7 @@ if hasattr(os, 'O_NOINHERIT'):
 		except OSError:
 			raise IOError('Cannot read from %r' % f)
 
-		if sys.hexversion > 0x3000000 and not 'b' in m:
+		if sys.hexversion > 0x3000000 and 'b' not in m:
 			m += 'b'
 			f = os.fdopen(fd, m)
 			try:
@@ -247,7 +247,7 @@ if hasattr(os, 'O_NOINHERIT'):
 		return txt
 
 	def writef_win32(f, data, m='w', encoding='ISO8859-1'):
-		if sys.hexversion > 0x3000000 and not 'b' in m:
+		if sys.hexversion > 0x3000000 and 'b' not in m:
 			data = data.encode(encoding)
 			m += 'b'
 		flags = os.O_CREAT | os.O_TRUNC | os.O_WRONLY | os.O_NOINHERIT
@@ -345,7 +345,7 @@ if is_win32:
 			s += os.sep
 
 		if not os.path.isdir(s):
-			e = OSError('%s is not a directory' % s)
+			e = OSError(f'{s} is not a directory')
 			e.errno = errno.ENOENT
 			raise e
 		return os.listdir(s)
@@ -364,11 +364,7 @@ def num2ver(ver):
 	if isinstance(ver, str):
 		ver = tuple(ver.split('.'))
 	if isinstance(ver, tuple):
-		ret = 0
-		for i in range(4):
-			if i < len(ver):
-				ret += 256**(3 - i) * int(ver[i])
-		return ret
+		return sum(256**(3 - i) * int(ver[i]) for i in range(4) if i < len(ver))
 	return ver
 
 def ex_stack():
@@ -394,10 +390,7 @@ def to_list(sth):
 	:return: Argument converted to list
 
 	"""
-	if isinstance(sth, str):
-		return sth.split()
-	else:
-		return sth
+	return sth.split() if isinstance(sth, str) else sth
 
 re_nl = re.compile('\r*\n', re.M)
 def str_to_dict(txt):
@@ -432,7 +425,7 @@ def split_path(path):
 def split_path_cygwin(path):
 	if path.startswith('//'):
 		ret = path.split('/')[2:]
-		ret[0] = '/' + ret[0]
+		ret[0] = f'/{ret[0]}'
 		return ret
 	return path.split('/')
 

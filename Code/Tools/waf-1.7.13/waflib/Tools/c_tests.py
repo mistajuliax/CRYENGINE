@@ -65,9 +65,7 @@ def check_library(self, mode=None, test_exec=True):
 	:type mode: string
 	"""
 	if not mode:
-		mode = 'c'
-		if self.env.CXX:
-			mode = 'cxx'
+		mode = 'cxx' if self.env.CXX else 'c'
 	self.check(
 		compile_filename = [],
 		features = 'link_lib_test',
@@ -102,14 +100,10 @@ def check_inline(self, **kw):
 
 	self.start_msg('Checking for inline')
 
-	if not 'define_name' in kw:
+	if 'define_name' not in kw:
 		kw['define_name'] = 'INLINE_MACRO'
-	if not 'features' in kw:
-		if self.env.CXX:
-			kw['features'] = ['cxx']
-		else:
-			kw['features'] = ['c']
-
+	if 'features' not in kw:
+		kw['features'] = ['cxx'] if self.env.CXX else ['c']
 	for x in INLINE_VALUES:
 		kw['fragment'] = INLINE_CODE % (x, x)
 
@@ -145,17 +139,13 @@ def check_large_file(self, **kw):
 	:type execute: bool
 	"""
 
-	if not 'define_name' in kw:
+	if 'define_name' not in kw:
 		kw['define_name'] = 'HAVE_LARGEFILE'
-	if not 'execute' in kw:
+	if 'execute' not in kw:
 		kw['execute'] = True
 
-	if not 'features' in kw:
-		if self.env.CXX:
-			kw['features'] = ['cxx', 'cxxprogram']
-		else:
-			kw['features'] = ['c', 'cprogram']
-
+	if 'features' not in kw:
+		kw['features'] = ['cxx', 'cxxprogram'] if self.env.CXX else ['c', 'cprogram']
 	kw['fragment'] = LARGE_FRAGMENT
 
 	kw['msg'] = 'Checking for large file support'

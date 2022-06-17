@@ -10,14 +10,18 @@ from waflib.Utils import run_once
 def module_extensions_ncurses(ctx, kw, entry_prefix, platform, configuration):
 
 	if platform.startswith('linux_x64'):
-		kw[entry_prefix + 'includes'] += [ ctx.CreateRootRelativePath('Code/SDKs/ncurses/include')]
-		kw[entry_prefix + 'lib']      += [ 'ncursesw', 'menuw', 'formw' ]
-		kw[entry_prefix + 'libpath']  += [ ctx.CreateRootRelativePath('Code/SDKs/ncurses/lib') ]
+		kw[f'{entry_prefix}includes'] += [
+		    ctx.CreateRootRelativePath('Code/SDKs/ncurses/include')
+		]
+		kw[f'{entry_prefix}lib'] += [ 'ncursesw', 'menuw', 'formw' ]
+		kw[f'{entry_prefix}libpath'] += [
+		    ctx.CreateRootRelativePath('Code/SDKs/ncurses/lib')
+		]
 	else:
 		return
 
-	if not platform  == 'project_generator':
-		kw[entry_prefix + 'features'] += [ 'copy_ncurses_binaries' ]
+	if platform != 'project_generator':
+		kw[f'{entry_prefix}features'] += [ 'copy_ncurses_binaries' ]
 
 
 @feature('copy_ncurses_binaries')
@@ -46,8 +50,8 @@ def copy_ncurses_binaries(self):
 			if os.path.isfile(os.path.join(ncurses_libpath, f)):
 				self.create_task('copy_outputs', self.bld.root.make_node(os.path.join(ncurses_libpath, f)), output_folder.make_node(f))
 			else:
-				Logs.error('[ERROR] Could not copy %s: file not found in %s.' % (f, ncurses_libpath))
+				Logs.error(f'[ERROR] Could not copy {f}: file not found in {ncurses_libpath}.')
 
 	else:
-		Logs.error('[ERROR] WAF does not support ncurses for platform %s.' % platform)
+		Logs.error(f'[ERROR] WAF does not support ncurses for platform {platform}.')
 

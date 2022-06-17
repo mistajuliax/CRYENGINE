@@ -53,15 +53,11 @@ class fortran_parser(object):
 		uses = []
 		mods = []
 		for line in txt.splitlines():
-			# line by line regexp search? optimize?
-			m = re_inc.search(line)
-			if m:
+			if m := re_inc.search(line):
 				incs.append(m.group(1))
-			m = re_use.search(line)
-			if m:
+			if m := re_use.search(line):
 				uses.append(m.group(1))
-			m = re_mod.search(line)
-			if m:
+			if m := re_mod.search(line):
 				mods.append(m.group(1))
 		return (incs, uses, mods)
 
@@ -91,13 +87,13 @@ class fortran_parser(object):
 			self.tryfind_header(x)
 
 		for x in uses:
-			name = "USE@%s" % x
-			if not name in self.names:
+			name = f"USE@{x}"
+			if name not in self.names:
 				self.names.append(name)
 
 		for x in mods:
-			name = "MOD@%s" % x
-			if not name in self.names:
+			name = f"MOD@{x}"
+			if name not in self.names:
 				self.names.append(name)
 
 	def tryfind_header(self, filename):
@@ -114,8 +110,7 @@ class fortran_parser(object):
 				self.nodes.append(found)
 				self.waiting.append(found)
 				break
-		if not found:
-			if not filename in self.names:
-				self.names.append(filename)
+		if not found and filename not in self.names:
+			self.names.append(filename)
 
 

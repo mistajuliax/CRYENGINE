@@ -29,14 +29,17 @@ def apply_manifest(self):
 	the manifest file, the binaries are unusable.
 	See: http://msdn2.microsoft.com/en-us/library/ms235542(VS.80).aspx
 	"""
-	if self.env.CC_NAME == 'msvc' and self.env.MSVC_MANIFEST and getattr(self, 'link_task', None) and not self.bld.env['PLATFORM'] == 'durango':
+	if (self.env.CC_NAME == 'msvc' and self.env.MSVC_MANIFEST
+	    and getattr(self, 'link_task', None)
+	    and self.bld.env['PLATFORM'] != 'durango'):
 		env = self.link_task.env		
-		
+
 		# Add additional manifest files
 		if hasattr(self, 'additional_manifests'):
-			for mt_dep in  self.additional_manifests:
-				env.append_value('LINKFLAGS', '/MANIFESTINPUT:' + self.path.make_node(mt_dep).abspath() )	
-				
+			for mt_dep in self.additional_manifests:
+				env.append_value(
+				    'LINKFLAGS', f'/MANIFESTINPUT:{self.path.make_node(mt_dep).abspath()}')	
+
 		# Embedding mode. Different for EXE's and DLL's.
 		# see: http://msdn2.microsoft.com/en-us/library/ms235591(VS.80).aspx
 		mode = ''
@@ -60,14 +63,14 @@ def exec_response_command(self, cmd, **kw):
 	try:
 		tmp = None
 		if sys.platform.startswith('win') and isinstance(cmd, list) and len(' '.join(cmd)) >= 8192:
-		        tmp_files_folder = self.generator.bld.get_bintemp_folder_node().make_node('TempFiles')
-		        program = cmd[0] #unquoted program name, otherwise exec_command will fail
-		        cmd = [self.quote_response_command(x) for x in cmd]
-		        out_file_prefix = os.path.split(cmd[-1])[1].replace('"', '') #remove quotes from prefix otherwise final output might look like abc"<os_generated_extension> which is invalid
-		        (fd, tmp) = tempfile.mkstemp(prefix=out_file_prefix, dir=tmp_files_folder.abspath())
-		        os.write(fd, '\r\n'.join(i.replace('\\', '\\\\') for i in cmd[1:]).encode())
-		        os.close(fd)
-		        cmd = [program, '@' + tmp]
+			tmp_files_folder = self.generator.bld.get_bintemp_folder_node().make_node('TempFiles')
+			program = cmd[0] #unquoted program name, otherwise exec_command will fail
+			cmd = [self.quote_response_command(x) for x in cmd]
+			out_file_prefix = os.path.split(cmd[-1])[1].replace('"', '') #remove quotes from prefix otherwise final output might look like abc"<os_generated_extension> which is invalid
+			(fd, tmp) = tempfile.mkstemp(prefix=out_file_prefix, dir=tmp_files_folder.abspath())
+			os.write(fd, '\r\n'.join(i.replace('\\', '\\\\') for i in cmd[1:]).encode())
+			os.close(fd)
+			cmd = [program, f'@{tmp}']
 		# no return here, that's on purpose
 		ret = self.generator.bld.exec_command(cmd, **kw)
 
@@ -101,7 +104,7 @@ def exec_command_msvc(self, *k, **kw):
 				carry = ''
 
 		k = [lst]
-		
+
 	bld = self.generator.bld
 	try:
 		if not kw.get('cwd', None):
@@ -109,8 +112,7 @@ def exec_command_msvc(self, *k, **kw):
 	except AttributeError:
 		bld.cwd = kw['cwd'] = bld.variant_dir
 
-	ret = self.exec_response_command(k[0], **kw)
-	return ret
+	return self.exec_response_command(k[0], **kw)
 		
 def wrap_class(class_name):
         """
@@ -147,7 +149,7 @@ for k in 'c cxx cprogram cxxprogram cshlib cxxshlib cstlib cxxstlib'.split():
 @after_method('apply_incpaths')
 @after_method('process_pch_msvc')
 def set_pdb_flags(self):
-	if not 'msvc' in (self.env.CC_NAME, self.env.CXX_NAME):
+	if 'msvc' not in (self.env.CC_NAME, self.env.CXX_NAME):
 		return	
 
 	# Not having PDBs stops CL.exe working for precompiled header when we have VCCompiler set to true for IB...
@@ -156,12 +158,12 @@ def set_pdb_flags(self):
 
 	# Compute PDB file path
 	pdb_folder = self.path.get_bld()
-	pdb_file = pdb_folder.make_node(str(self.idx) + '.pdb')
-	pdb_cxxflag = '/Fd' + pdb_file.abspath() + ''
+	pdb_file = pdb_folder.make_node(f'{str(self.idx)}.pdb')
+	pdb_cxxflag = f'/Fd{pdb_file.abspath()}'
 
 	# Make sure the PDB folder exists
 	pdb_folder.mkdir()
-	
+
 	if getattr(self, 'link_task', None) and self._type != 'stlib':
 		pdbnode = self.link_task.outputs[0].change_ext('.pdb')
 		self.link_task.outputs.append(pdbnode)
@@ -200,17 +202,17 @@ def set_pdb_flags(self):
 @feature('cxxprogram', 'cxxshlib', 'cprogram', 'cshlib', 'cxx', 'c')
 @after_method('apply_link')
 def apply_map_file(self):
-	if not 'msvc' in (self.env.CC_NAME, self.env.CXX_NAME):
+	if 'msvc' not in (self.env.CC_NAME, self.env.CXX_NAME):
 		return	
 
 	# Dont create map files if not asked for
 	if not self.bld.is_option_true('generate_map_file'):
 		return
-		
+
 	if getattr(self, 'link_task', None) and self._type != 'stlib':
 		map_file_node = self.link_task.outputs[0].change_ext('.map')
 		self.link_task.outputs.append(map_file_node)
-		self.env.append_value('LINKFLAGS', '/MAP:' + map_file_node.abspath())		
+		self.env.append_value('LINKFLAGS', f'/MAP:{map_file_node.abspath()}')		
 
 #############################################################################
 #############################################################################
@@ -232,16 +234,16 @@ def quote_response_command_orbis(self, flag):
 	
 #############################################################################
 def exec_response_command_orbis(self, cmd, **kw):
-	# not public yet	
+	# not public yet
 	try:
 		tmp = None
-		if sys.platform.startswith('win') and isinstance(cmd, list) and len(' '.join(cmd)) >= 8192:			
+		if sys.platform.startswith('win') and isinstance(cmd, list) and len(' '.join(cmd)) >= 8192:	
 			program = cmd[0] #unquoted program name, otherwise exec_command will fail
 			cmd = [self.quote_response_command_orbis(x) for x in cmd]
 			(fd, tmp) = tempfile.mkstemp()
 			os.write(fd, '\r\n'.join(i.replace('\\', '\\\\') for i in cmd[1:]).encode())
 			os.close(fd)
-			cmd = [program, '@' + tmp]
+			cmd = [program, f'@{tmp}']
 		# no return here, that's on purpose
 		ret = self.generator.bld.exec_command(cmd, **kw)
 	finally:
@@ -294,7 +296,7 @@ def wrap_class_orbis(class_name):
 	derived_class = type(class_name, (cls,), {})
 
 	def exec_command(self, *k, **kw):
-		if self.env['CC_NAME'] == 'orbis-clang' or self.env['CC_NAME'] == 'gcc':
+		if self.env['CC_NAME'] in ['orbis-clang', 'gcc']:
 			return self.exec_command_orbis_clang(*k, **kw)
 		else:
 			return super(derived_class, self).exec_command(*k, **kw)
@@ -322,9 +324,9 @@ from waflib.Task import Task
 @feature('cxx')
 @after_method('apply_incpaths')
 def process_pch_msvc(self):	
-	if not 'msvc' in (self.env.CC_NAME, self.env.CXX_NAME):
+	if 'msvc' not in (self.env.CC_NAME, self.env.CXX_NAME):
 		return
-		
+
 	if Utils.unversioned_sys_platform() != 'win32':
 		return
 
@@ -348,29 +350,29 @@ def process_pch_msvc(self):
 	# Create PCH Task
 	self.pch_task = pch_task = self.create_task('pch_msvc', pch_source, [pch_object,pch_file])
 	pch_task.env.append_value( 'PCH_NAME', pch_header_name )
-	pch_task.env.append_value( 'PCH_FILE', '/Fp' + pch_file.abspath() )
+	pch_task.env.append_value('PCH_FILE', f'/Fp{pch_file.abspath()}')
 	pch_task.env.append_value( 'PCH_OBJ', pch_object.abspath() )
-	
+
 	# Append PCH File to each compile task
-	for t in getattr(self, 'compiled_tasks', []):	
+	for t in getattr(self, 'compiled_tasks', []):
 		input_file = t.inputs[0].abspath()
 		file_specific_settings = self.file_specifc_settings.get(input_file, None)
 		if file_specific_settings and 'disable_pch' in file_specific_settings and file_specific_settings['disable_pch'] == True:
 			continue # Don't append PCH to files for which we don't use them
-			
-		if getattr(t, 'disable_pch', False) == True:
+
+		if getattr(t, 'disable_pch', False):
 			continue # Don't append PCH to files for which we don't use them
-			
+
 		if t.__class__.__name__ == 'cxx': #Is there a better way to ensure cpp only?
-			pch_flag = '/Fp' + pch_file.abspath()
-			pch_header = '/Yu' + pch_header_name
-			t.env.append_value('CXXFLAGS', pch_header) 
+			pch_flag = f'/Fp{pch_file.abspath()}'
+			pch_header = f'/Yu{pch_header_name}'
+			t.env.append_value('CXXFLAGS', pch_header)
 			t.env.append_value('CXXFLAGS', pch_flag)
 
 			# Append PCH to task input to ensure correct ordering
 			t.dep_nodes.append(pch_object)
 
-	
+
 	if getattr(self, 'link_task', None):
 		self.link_task.inputs.append(pch_object)
 	
@@ -394,27 +396,27 @@ from waflib.Tools import cxx,c
 @after_method('apply_incpaths')
 def process_pch_orbis(self):
 
-	if not 'orbis-clang' in (self.env.CC_NAME, self.env.CXX_NAME):
+	if 'orbis-clang' not in (self.env.CC_NAME, self.env.CXX_NAME):
 		return
 
 	# Create Task to compile PCH
 	if not getattr(self, 'pch', ''):
 		return
-	
+
 	if not self.is_option_true('use_precompiled_header'):
 		return
-	
+
 	# Always assume only one PCH File
 	pch_source = self.to_nodes(self.pch)[0]
 
-	pch_header = pch_source.change_ext('.h')	
+	pch_header = pch_source.change_ext('.h')
 	pch_file = pch_source.change_ext('.h.pch')
-	
+
 	# Create PCH Task
 	self.create_task('pch_orbis', pch_source, pch_file)
 
 	# Append PCH File to each compile task
-	for t in getattr(self, 'compiled_tasks', []):	
+	for t in getattr(self, 'compiled_tasks', []):
 		if t.__class__.__name__ == 'cxx': 
 			# we need to get the absolute path to the pch.h.pch
 			# which we then need to include as pch.h
@@ -422,11 +424,11 @@ def process_pch_orbis(self):
 			# we do the name replacement outself :)
 			pch_file_name = pch_file.abspath()
 			pch_file_name = pch_file_name.replace('.h.pch', '.h')
-			pch_flag = '-include' + pch_file_name
+			pch_flag = f'-include{pch_file_name}'
 
-			t.env.append_value('CXXFLAGS', pch_flag) 	
+			t.env.append_value('CXXFLAGS', pch_flag)
 			t.env.append_value('CFLAGS', pch_flag) 	
-			
+
 			# Append PCH to task input to ensure correct ordering
 			t.dep_nodes.append(pch_file)
 
@@ -439,30 +441,25 @@ def _preserved_order_remove_compiler_option_duplicates(options_seq, mutatable_op
 	seen = set()
 	
 	def _keep_value(value):
-		# Strip '-' postfix if any 
-		if value.endswith('-'):
-			_val = value[:-1]
-		else:
-			_val = value
-			
+		# Strip '-' postfix if any
+		_val = value[:-1] if value.endswith('-') else value
 		# Step 1: Check if option already in list
 		if _val in seen:
 			return False
-			
+
 		# Step 2: Check for mutual exclusive option e.g. '/O1', '/O2', '/Od', '/Ox'
 		for mutual_set in mutual_exlusive_options:
 				if _val in mutual_set:
 					ret = seen.update(mutual_set)
 					return True # This option must be first time seen since Step 1 did not trigger
-										
+
 		# Step 3: Check mutatable options e.g. '/EHa','/EHs','/EHsc'
 		for option in mutatable_options:
 			if _val.startswith(option):
 				if option in seen:
 					return False
-				else:
-					seen.add(option)
-					return True		
+				seen.add(option)
+				return True		
 
 		# Step 4: Option is not special, add to seen
 		seen.add(_val)
@@ -484,7 +481,7 @@ def verify_options_common(env):
 		frozenset(['/MD', '/MT', '/LD', '/MDd', '/MTd', '/LDd']),
 		frozenset(['/W0', '/W1', '/W2', '/W3', '/W4']),
 		frozenset(['/Zp1', '/Zp2', '/Zp4', '/Zp8', '/Zp16'])]	
-		
+
 	# Mutatable options 
 	#   e.g. '/EHa','/EHs','/EHsc' or '/favor:AMD64','/favor:INTEL64', '/favor:ATOM'
 	mutatable_options = [
@@ -498,13 +495,13 @@ def verify_options_common(env):
 		'/vd',		
 		'/RTC',
 		'/volatile' ]
-		
+
 	# For identical list we only need to strip once
 	identical_lists = env.CFLAGS == env.CXXFLAGS
-	
+
 	# Strip CFLAGS
 	env.CFLAGS = _preserved_order_remove_compiler_option_duplicates(env.CFLAGS, mutatable_options, mutual_exlusive_options)
-	
+
 	# Strip CXXFLAGS or copy CFLAGS into CXXFLAGS
 	if identical_lists:
 		env.CXXFLAGS = list(env.CFLAGS)
@@ -520,16 +517,16 @@ def verify_options_common(env):
 @after_method('apply_link')
 @after_method('process_pch_msvc')
 def verify_compiler_options_msvc(self):
-	if not 'msvc' in (self.env.CC_NAME, self.env.CXX_NAME):
+	if 'msvc' not in (self.env.CC_NAME, self.env.CXX_NAME):
 		return
-	
+
 	if Utils.unversioned_sys_platform() != 'win32':
 		return
-		
+
 	# Enable for debugging
 	#import time
 	#t1 = time.clock() 
-	
+
 	# Verify compiler option (strip all but last for dependant options)
 	for t in getattr(self, 'compiled_tasks', []):			
 		verify_options_common(t.env)
@@ -562,11 +559,7 @@ all_versions = [('14.0', '10.0.10586.0'), ('14.0', '10.0.10240.0'), ('12.0', '8.
 
 # Look up the default Windows SDK version to use for the given MSVC version
 def get_winsdk_for_msvc_version(version):
-	result = []
-	for (v, sdk) in all_versions:
-		if v == version:
-			result += [ sdk ]
-	return result
+	return [sdk for v, sdk in all_versions if v == version]
 
 # Look up all supported MSVC version, in order of preference (preference used by auto-detect only)
 def get_supported_msvc_versions():
@@ -594,10 +587,7 @@ def get_subfolders_for_target_arch(target, arch):
 # Look up dependency folders (needs to be in PATH when the compiler runs) for a given compiler subfolder
 # This subfolder was previously returned as an element of get_subfolders_for_target_arch()
 def get_dependency_subfolder_for_compiler_subfolder(subfolder):
-	for (t, a, s, d) in all_msvc_platforms:
-		if s == subfolder:
-			return d;
-	return '';
+	return next((d for t, a, s, d in all_msvc_platforms if s == subfolder), '')
 
 # Given a Windows SDK version, retrieves the requested subfolder (relative to the Windows SDK installation location)
 # This should abstract differences between Windows SDK layout changes
@@ -610,15 +600,12 @@ def get_winsdk_subfolder(version, subfolder):
 	except:
 		pass
 	if is_new_sdk_layout:
-		if 'lib' in subfolder.lower() or 'inc' in subfolder.lower():
-			return os.path.join(subfolder, version)
-		else:
-			return os.path.join(subfolder)
-	else:
-		if 'lib' in subfolder.lower() and version == '8.0':
-			return os.path.join(subfolder, 'win8')
-		if 'lib' in subfolder.lower() and version == '8.1':
-			return os.path.join(subfolder, 'winv6.3')
+		return (os.path.join(subfolder, version) if 'lib' in subfolder.lower()
+		        or 'inc' in subfolder.lower() else os.path.join(subfolder))
+	if 'lib' in subfolder.lower() and version == '8.0':
+		return os.path.join(subfolder, 'win8')
+	if 'lib' in subfolder.lower() and version == '8.1':
+		return os.path.join(subfolder, 'winv6.3')
 	return subfolder
 
 # Given a path to a MSVC folder, finds the folders that will allow compilation for the given target/arch tuple
@@ -635,10 +622,7 @@ def get_msvc_for_target_arch(path, target, arch, verbose):
 		compiler_bin = os.path.join(path, 'bin', subfolder)
 		if os.path.isdir(compiler_bin) and os.path.isfile(os.path.join(compiler_bin, 'cl.exe')):
 			# Set up compiler
-			result = {}
-			result['root'] = path
-			result['bin'] = os.path.normpath(compiler_bin)
-
+			result = {'root': path, 'bin': os.path.normpath(compiler_bin)}
 			# Add VC paths
 			result['path'] = [ result['bin'] ]
 			dependency_bin = get_dependency_subfolder_for_compiler_subfolder(subfolder)
@@ -672,7 +656,7 @@ def get_msvc_for_target_arch(path, target, arch, verbose):
 					if os.path.isdir(os.path.join(redist, dir)):
 						type = dir.split('.')[-1].lower()
 						result['redist'][type] = os.path.join(redist, dir)
-						
+
 			# Add CRT dependecies for invoked compiler executable  e.g. amd64_x86 
 			compiler_redist = os.path.join(path, 'redist', 'x64' if arch == 'amd64' else arch)
 			if os.path.isdir(compiler_redist):
@@ -682,7 +666,7 @@ def get_msvc_for_target_arch(path, target, arch, verbose):
 						type = dir.split('.')[-1].lower()
 						if type == 'crt':
 							result['path'] += [os.path.join(compiler_redist, dir)]	
-						
+
 			return result
 
 	Logs.info("[NOTE] Unable find any MSVC C++ compiler (cl.exe) for '%s' in path (and subfolders): '%s'" % (target, os.path.join(path, 'bin')))
@@ -709,15 +693,9 @@ def get_winsdk_for_target(path, version, target):
 		libs = [ os.path.join(lib, 'um', target), os.path.join(lib, 'ucrt', target) ]
 		includes = [ os.path.normpath(x) for x in includes if os.path.isdir(x) ]
 		libs = [ os.path.normpath(x) for x in libs if os.path.isdir(x) ]
-		if len(includes) != 0 and len(libs) != 0:
+		if includes and libs:
 			# Set up SDK
-			result = {}
-			result['root'] = path
-			result['bin'] = os.path.normpath(bin)
-
-			# Add SDK paths (we could add bin here, but it shouldn't be necessary)
-			result['path'] = [ ]
-
+			result = {'root': path, 'bin': os.path.normpath(bin), 'path': []}
 			# Add SDK includes
 			result['include'] = includes
 
@@ -754,8 +732,8 @@ def load_msvc_compiler(conf, target, arch):
 	# Any fatal errors will already have occurred during the detect function call above
 	global HAS_DIAGNOSED
 	has_diagnosed = True
-	if not target + '_' + arch in HAS_DIAGNOSED:
-		HAS_DIAGNOSED += [ target + '_' + arch ]
+	if f'{target}_{arch}' not in HAS_DIAGNOSED:
+		HAS_DIAGNOSED += [f'{target}_{arch}']
 		has_diagnosed = False
 	verbose = conf.is_option_true('auto_detect_verbose') and not has_diagnosed
 
@@ -768,10 +746,12 @@ def load_msvc_compiler(conf, target, arch):
 		type = 'bootstrapped'
 		if verbose:
 			Logs.info('[NOTE] Ignoring --auto-detect-verbose when --auto-detect-compiler is disabled')
-		
+
 	if not has_diagnosed:
 		# Show diagnostics for this target/arch pair
-		Logs.info('[NOTE] Using %s MSVC %s (%s) with Windows SDK %s' % (type, compiler['version'], os.path.split(compiler['bin'])[1], sdk['version']))
+		Logs.info(
+		    f"[NOTE] Using {type} MSVC {compiler['version']} ({os.path.split(compiler['bin'])[1]}) with Windows SDK {sdk['version']}"
+		)
 
 	# Apply general paths
 	v['PATH'] = compiler['path'] + sdk['path'] + [sdk['bin']]
@@ -784,7 +764,7 @@ def load_msvc_compiler(conf, target, arch):
 	v['LINK'] = v['LINK_CC'] = v['LINK_CXX'] = os.path.join(compiler['bin'], 'link.exe')
 	v['MT'] = os.path.join(sdk['bin'], 'mt.exe')
 	v['WINRC'] = os.path.join(sdk['bin'], 'rc.exe')
-	
+
 	# Verify the tools exist
 	if not os.path.isfile(v['AR']):
 		conf.fatal('C/C++ archiver not found at ' + v['AR'])
@@ -806,7 +786,7 @@ def load_msvc_compiler(conf, target, arch):
 	# Apply WINSDK paths (for later use by Windows specific build steps)
 	v['WINSDK_PATH'] = sdk['root']
 	v['WINSDK_VERSION'] = sdk['version']
-	
+
 	# Apply merged redist path dictionaries
 	v['REDIST_PATH'] = {}
 	v['REDIST_PATH'].update(compiler['redist'])
@@ -814,7 +794,7 @@ def load_msvc_compiler(conf, target, arch):
 
 	# Add MSVC required path to global path
 	v.env = os.environ.copy()
-	if not 'PATH' in v.env:
+	if 'PATH' not in v.env:
 		v.env['PATH'] = ''
 	v.env['PATH'] = ';'.join(v['PATH']) + ';' + v.env['PATH']
 
@@ -832,17 +812,22 @@ def detect_bootstrapped_msvc_compiler(conf, target, arch, verbose):
 	msvc_compiler_base_folder = conf.CreateRootRelativePath('Code/SDKs/Microsoft Visual Studio Compiler')
 	msvc_compiler_folder = ""
 	msvc_dot_version = ""
-	
+
 	force_msvc_version = conf.options.force_msvc.lower()
 	if force_msvc_version == 'auto':
 		# Find MSVC version depending on preference order in all_versions
 		msvc_versions_to_check = get_supported_msvc_versions()
 	else:
 		# Force MSVC version
-		msvc_versions_to_check =  [force_msvc_version if force_msvc_version.find('.') != -1 else force_msvc_version + '.0']
-		
-		if not msvc_versions_to_check[0] in get_supported_msvc_versions():
-			conf.fatal('[ERROR]: The --force-msvc value %s could not be satisfied, the following are supported on this system: %s' % (msvc_versions_to_check[0], get_supported_msvc_versions()))
+		msvc_versions_to_check = [
+		    force_msvc_version
+		    if force_msvc_version.find('.') != -1 else f'{force_msvc_version}.0'
+		]
+
+		if msvc_versions_to_check[0] not in get_supported_msvc_versions():
+			conf.fatal(
+			    f'[ERROR]: The --force-msvc value {msvc_versions_to_check[0]} could not be satisfied, the following are supported on this system: {get_supported_msvc_versions()}'
+			)
 
 	# Find MSVC version folder
 	for msvc_version in msvc_versions_to_check:
@@ -852,28 +837,28 @@ def detect_bootstrapped_msvc_compiler(conf, target, arch, verbose):
 			break
 		else:
 			msvc_compiler_folder = ""
-	
+
 	if not msvc_compiler_folder:
-		conf.fatal('[ERROR] Unable to find supported MSVC version at: %s supported versions:%s' % (msvc_compiler_folder , get_supported_msvc_versions()))
-	
+		conf.fatal(
+		    f'[ERROR] Unable to find supported MSVC version at: {msvc_compiler_folder} supported versions:{get_supported_msvc_versions()}'
+		)
+
 	# Find WinSDK version
 	# Note: We assume here that the bootstrapped MSVC is in the preferred list
 	sdk_version = ""
-	if not conf.options.force_winsdk.lower() == 'auto':
-		preferred_windows_sdks = [conf.options.force_winsdk.lower()]
-	else:
-		preferred_windows_sdks = get_winsdk_for_msvc_version(msvc_dot_version)
-		
+	preferred_windows_sdks = (get_winsdk_for_msvc_version(msvc_dot_version)
+	                          if conf.options.force_winsdk.lower() == 'auto' else
+	                          [conf.options.force_winsdk.lower()])
 	sdk_folder = conf.CreateRootRelativePath('Code/SDKs/Microsoft Windows SDK')
-	
+
 	base_sdk_version = str.split(preferred_windows_sdks[-1], '.')[0]
-	
+
 	# Note: Bootstrapped SDKs are in a non-default folder name (with a v prefix) for 8.0 and 8.1
 	# Accounts for these special cases so we don't need to re-sync the whole SDKs
 	if base_sdk_version == '8':
 		sdk_version =  preferred_windows_sdks[-1]
-		sdk_folder = os.path.join(sdk_folder, 'v' + preferred_windows_sdks[-1])
-		
+		sdk_folder = os.path.join(sdk_folder, f'v{preferred_windows_sdks[-1]}')
+
 	else:		
 		sdk_base_folder = os.path.join(sdk_folder, base_sdk_version)
 		for preferred_sdk_version in preferred_windows_sdks:
@@ -882,9 +867,10 @@ def detect_bootstrapped_msvc_compiler(conf, target, arch, verbose):
 				sdk_version = preferred_sdk_version
 				sdk_folder = sdk_base_folder
 				break
-				
-	if not os.path.isdir(sdk_folder):				
-		conf.fatal('[ERROR] Unable to find supported WinSDK directory at: %s' % sdk_folder)
+
+	if not os.path.isdir(sdk_folder):			
+		conf.fatal(
+		    f'[ERROR] Unable to find supported WinSDK directory at: {sdk_folder}')
 
 	# Get the compiler information
 	compiler = get_msvc_for_target_arch(msvc_compiler_folder, target, arch, verbose)
@@ -908,21 +894,25 @@ def auto_detect_msvc_compiler(conf, target, arch, verbose, has_diagnosed):
 	force_msvc = conf.options.force_msvc.lower()
 	compiler = {}
 	if force_msvc != 'auto':
-		if  force_msvc.find('.') == -1:
-			force_msvc = force_msvc + ".0"
-				
-		if not force_msvc in compilers:
-			conf.fatal('[ERROR]: The --force-msvc value %s could not be satisfied, the following are supported on this system: %s' % (force_msvc, ', '.join(compilers.keys())))
+		if force_msvc.find('.') == -1:
+			force_msvc = f"{force_msvc}.0"
+
+		if force_msvc not in compilers:
+			conf.fatal(
+			    f"[ERROR]: The --force-msvc value {force_msvc} could not be satisfied, the following are supported on this system: {', '.join(compilers.keys())}"
+			)
 		else:
 			compiler = compilers[force_msvc]
 			if verbose:
-				Logs.info( '[NOTE] Picking MSVC %s because --force-msvc is set' % force_msvc)
+				Logs.info(f'[NOTE] Picking MSVC {force_msvc} because --force-msvc is set')
 	else:
 		for version in get_supported_msvc_versions():
 			if version in compilers:
 				compiler = compilers[version]
 				if verbose:
-					Logs.info( '[NOTE] Picking MSVC %s because it is the first supported by preference from list: %s' % (version, ', '.join(get_supported_msvc_versions())))
+					Logs.info(
+					    f"[NOTE] Picking MSVC {version} because it is the first supported by preference from list: {', '.join(get_supported_msvc_versions())}"
+					)
 				break
 
 	# Pick the first available compiler and hope for the best
@@ -932,39 +922,50 @@ def auto_detect_msvc_compiler(conf, target, arch, verbose, has_diagnosed):
 		if len(compilers) != 0:
 			compiler = compilers.values()[0]
 			if not has_diagnosed:
-				Logs.warn('[WARNING]: Picking MSVC %s, which is not (yet) supported by WAF. Supported versions: %s' % (compilers.keys()[0], ', '.join(get_supported_msvc_versions())))
-				Logs.info( '[NOTE] Consider setting --force-msvc to override this warning, available list: %s' % ', '.join(compilers.keys()))
+				Logs.warn(
+				    f"[WARNING]: Picking MSVC {compilers.keys()[0]}, which is not (yet) supported by WAF. Supported versions: {', '.join(get_supported_msvc_versions())}"
+				)
+				Logs.info(
+				    f"[NOTE] Consider setting --force-msvc to override this warning, available list: {', '.join(compilers.keys())}"
+				)
 		if not verbose:
 			Logs.info( '[NOTE] Consider running "configure" with --auto-detect-verbose turned on for additional information')
-		if len(compiler) == 0:
-			conf.fatal('[ERROR]: No installed MSVC compiler could be found for target (%s, %s)' % (target, arch))
+	if len(compiler) == 0:
+		conf.fatal(
+		    f'[ERROR]: No installed MSVC compiler could be found for target ({target}, {arch})'
+		)
 	msvc_version = compiler['version']
 
 	# Pick which SDK to use
 	force_winsdk = conf.options.force_winsdk.lower()
 	sdk = {}
-	if force_winsdk != 'auto':
-		if not force_winsdk in sdks:
-			conf.fatal('[ERROR]: The --force-winsdk value %s could not be satisfied, the following are supported on this system: %s' % (force_winsdk, ', '.join(sdks.keys())))
-		else:
-			sdk = sdks[force_winsdk]
-			if verbose:
-				Logs.info( '[NOTE] Picking Windows SDK %s because --force-winsdk is set' % force_winsdk)
-	else:
+	if force_winsdk == 'auto':
 		preferred_versions = get_winsdk_for_msvc_version(msvc_version)
 		for preferred_version in preferred_versions:
 			if preferred_version in sdks:
 				sdk = sdks[preferred_version]
 				if verbose:
-					Logs.info('[NOTE] Picking Windows SDK %s because it is preferred by MSVC %s' % (preferred_version, msvc_version))
+					Logs.info(
+					    f'[NOTE] Picking Windows SDK {preferred_version} because it is preferred by MSVC {msvc_version}'
+					)
 
 
-	# Pick an SDK which roughly matches 
+	elif force_winsdk not in sdks:
+		conf.fatal(
+		    f"[ERROR]: The --force-winsdk value {force_winsdk} could not be satisfied, the following are supported on this system: {', '.join(sdks.keys())}"
+		)
+	else:
+		sdk = sdks[force_winsdk]
+		if verbose:
+			Logs.info(
+			    f'[NOTE] Picking Windows SDK {force_winsdk} because --force-winsdk is set'
+			)
+	# Pick an SDK which roughly matches
 	if len(sdk) == 0:
 		preferred_versions = get_winsdk_for_msvc_version(msvc_version)
 
 		potential_sdks = []		
-		
+
 		for preferred_version in get_winsdk_for_msvc_version(msvc_version):		
 			preferred_version_len = len(preferred_version)
 			preferred_version_base = "".join(str.split(preferred_version, '.')[:2]) # we are only interested in the major and minor number e.g. 8.1, 10.0
@@ -980,34 +981,46 @@ def auto_detect_msvc_compiler(conf, target, arch, verbose, has_diagnosed):
 			sorted(potential_sdks, key= lambda sdk_version: int("".join(sdk_version.split('.'))))
 			sdk = sdks[potential_sdks[-1]] # take the highest verision number (list is sorted lowest to highest)
 			if verbose:
-				Logs.info( '[NOTE] Picking Windows SDK %s because it appears to be the closest match any of the preferred Windows SDK versions (%s) for MSVC %s. Potential installed Windows SDKs list (%s)' % (potential_sdks[-1], preferred_version, msvc_version, potential_sdks) )
-				
+				Logs.info(
+				    f'[NOTE] Picking Windows SDK {potential_sdks[-1]} because it appears to be the closest match any of the preferred Windows SDK versions ({preferred_version}) for MSVC {msvc_version}. Potential installed Windows SDKs list ({potential_sdks})'
+				)
+
 			if not has_diagnosed:
-				Logs.warn( '[WARNING] Unable to detect any of the CryEngine supported Windows SDK versions (%s) for MSVC %s. Picking best match %s.' % (preferred_version, msvc_version, potential_sdks[-1]) )
+				Logs.warn(
+				    f'[WARNING] Unable to detect any of the CryEngine supported Windows SDK versions ({preferred_version}) for MSVC {msvc_version}. Picking best match {potential_sdks[-1]}.'
+				)
 				Logs.warn( '[WARNING] Compatibility issues may be experienced.')
-		
+
 	# Pick the first supported SDK, or just a random one
 	# Note: This is a fallback so we at least attempt compilation, but it may just straight up fail
 	# In general, if support for a compiler is needed, it should be added to the all_versions global in favor of compiling with --force-msvc & --force-winsdk
-	if len(sdk) == 0:	
+	if len(sdk) == 0:
 		preferred_versions = get_winsdk_for_msvc_version(msvc_version)
-		installed_skd_versions = sdks.keys()	
+		installed_skd_versions = sdks.keys()
 		sorted(installed_skd_versions, key= lambda sdk_version: int("".join(sdk_version.split('.'))))
 		sdk = sdks[installed_skd_versions[-1]]
-		
+
 		if verbose:
-			Logs.info( '[NOTE] Picking Windows SDK %s because it is the highest installed version. This version might not be compatible with the MSVC %s version. Installed Windows SDKs %s' % (installed_skd_versions[-1], msvc_version, installed_skd_versions) )
-		
+			Logs.info(
+			    f'[NOTE] Picking Windows SDK {installed_skd_versions[-1]} because it is the highest installed version. This version might not be compatible with the MSVC {msvc_version} version. Installed Windows SDKs {installed_skd_versions}'
+			)
+
 		if not has_diagnosed:
 			Logs.warn( '[WARNING] Unable to detect any of the CryEngine supported Windows SDK versions for MSVC %s. Picking highest installed Windows SDK %s.\nCompatibility issues may be experienced.' % ( msvc_version, installed_skd_versions[-1]) )
-			Logs.info( '[NOTE] WAF supports the following Windows SDKs for use by MSVC %s: %s' % (msvc_version, ', '.join(preferred_versions) if preferred_versions else '-No Windows SDK supported for compiler'))
-			Logs.info( '[NOTE] Consider setting --force-winsdk to override this warning with one of the Windows SDKs installed: %s' % ', '.join(sdks.keys()))
-		
+			Logs.info(
+			    f"[NOTE] WAF supports the following Windows SDKs for use by MSVC {msvc_version}: {', '.join(preferred_versions) if preferred_versions else '-No Windows SDK supported for compiler'}"
+			)
+			Logs.info(
+			    f"[NOTE] Consider setting --force-winsdk to override this warning with one of the Windows SDKs installed: {', '.join(sdks.keys())}"
+			)
+
 		if not verbose:
 			Logs.info( '[NOTE] Consider running "configure" with --auto-detect-verbose=True for additional information')
-		
-		if len(sdk) == 0:
-			conf.fatal('[ERROR]: No installed Windows SDK could be found for target (%s, %s)' % (target, arch))
+
+	if len(sdk) == 0:
+		conf.fatal(
+		    f'[ERROR]: No installed Windows SDK could be found for target ({target}, {arch})'
+		)
 
 	return sdk, compiler
 
@@ -1058,11 +1071,13 @@ def get_msvc_versions(conf, target, arch, verbose):
 		if verbose:
 			Logs.info('[NOTE] There are %u suitable Windows SDKs for target %s: %s (unsuitable: %u)' % (len(suitable), target, ', '.join(suitable), len(unsuitable)))
 		if len(sdks) == 0:
-			conf.fatal('[ERROR] None of the installed Windows SDK provides support for target %s (installed: %s)' % (target, ', '.join(WINSDK_INSTALLED_VERSIONS['all'].keys())))
+			conf.fatal(
+			    f"[ERROR] None of the installed Windows SDK provides support for target {target} (installed: {', '.join(WINSDK_INSTALLED_VERSIONS['all'].keys())})"
+			)
 		WINSDK_INSTALLED_VERSIONS[target] = sdks
 
 	# Get the MSVCs for this target/arch tuple
-	msvcs = MSVC_INSTALLED_VERSIONS.get(target + '@' + arch, {})
+	msvcs = MSVC_INSTALLED_VERSIONS.get(f'{target}@{arch}', {})
 	if len(msvcs) == 0:
 		suitable = []
 		unsuitable = []
@@ -1077,8 +1092,10 @@ def get_msvc_versions(conf, target, arch, verbose):
 		if verbose:
 			Logs.info('[NOTE] There are %u suitable MSVC for target (%s, %s): %s (unsuitable: %u)' % (len(suitable), target, arch, ', '.join(suitable), len(unsuitable)))
 		if len(msvcs) == 0:
-			conf.fatal('[ERROR] None of the installed MSVC provides support for target %s (host: %s, installed %s)' % (target, arch, ','.join(MSVC_INSTALLED_VERSIONS['all'].keys())))
-		MSVC_INSTALLED_VERSIONS[target + '@' + arch] = msvcs
+			conf.fatal(
+			    f"[ERROR] None of the installed MSVC provides support for target {target} (host: {arch}, installed {','.join(MSVC_INSTALLED_VERSIONS['all'].keys())})"
+			)
+		MSVC_INSTALLED_VERSIONS[f'{target}@{arch}'] = msvcs
 
 	return sdks, msvcs
 

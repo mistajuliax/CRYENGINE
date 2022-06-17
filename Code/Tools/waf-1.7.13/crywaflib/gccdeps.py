@@ -50,10 +50,7 @@ def remove_makefile_rule_lhs(line):
 	rulesep = ': '
 
 	sep_idx = line.find(rulesep)
-	if sep_idx >= 0:
-		return line[sep_idx + 2:]
-	else:
-		return line
+	return line[sep_idx + 2:] if sep_idx >= 0 else line
 
 def path_to_node(base_node, path, cached_nodes, b_orbis_hack):
 	# Take the base node and the path and return a node
@@ -81,7 +78,7 @@ def post_run(self):
 
 	if self.env.CC_NAME not in supported_compilers:
 		return self.no_gccdeps_post_run()
-		
+
 	if getattr(self, 'cached', None):
 		return Task.Task.post_run(self)
 
@@ -92,9 +89,9 @@ def post_run(self):
 
 	if self.inputs[0].abspath()[-2:] == '.s':
 		return Task.Task.post_run(self)
-		
+
 	name = self.outputs[0].abspath()
-	name = re_o.sub('.d', name)	
+	name = re_o.sub('.d', name)
 	txt = Utils.readf(name)
 	#os.remove(name)
 
@@ -117,7 +114,7 @@ def post_run(self):
 	# hand side of all these lines. After that, whatever remains are the
 	# implicit dependencies of task.outputs[0]
 	txt = '\n'.join([remove_makefile_rule_lhs(line) for line in txt.splitlines()])
-	
+
 	# Now join all the lines together
 	txt = txt.replace('\\\n', '')
 
@@ -139,8 +136,8 @@ def post_run(self):
 		if x[0] == '"':
 			x = x[1:]
 		if x[len(x)-1] == '"':
-			x = x[:len(x)-1]
-			
+			x = x[:-1]
+
 		if os.path.isabs(x):			
 			node = path_to_node(bld.root, x, cached_nodes, self.env['PLATFORM'] == 'orbis')
 
@@ -155,19 +152,18 @@ def post_run(self):
 
 		if not node:
 			raise ValueError('could not find %r for %r' % (x, self))
-		else:
-			if not c_preproc.go_absolute:
-				if not (node.is_child_of(bld.srcnode) or node.is_child_of(bld.bldnode)):
-					continue
+		if (not c_preproc.go_absolute and not node.is_child_of(bld.srcnode)
+		    and not node.is_child_of(bld.bldnode)):
+			continue
 
-			if id(node) == id(self.inputs[0]):
-				# ignore the source file, it is already in the dependencies
-				# this way, successful config tests may be retrieved from the cache
-				continue
+		if id(node) == id(self.inputs[0]):
+			# ignore the source file, it is already in the dependencies
+			# this way, successful config tests may be retrieved from the cache
+			continue
 
-			nodes.append(node)
+		nodes.append(node)
 
-	Logs.debug('deps: real scanner for %s returned %s' % (str(self), str(nodes)))
+	Logs.debug(f'deps: real scanner for {str(self)} returned {nodes}')
 
 	bld.node_deps[self.uid()] = nodes
 	bld.raw_deps[self.uid()] = []

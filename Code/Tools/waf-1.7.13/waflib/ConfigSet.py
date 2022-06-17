@@ -55,8 +55,7 @@ class ConfigSet(object):
 		while cur:
 			keys.update(cur.table.keys())
 			cur = getattr(cur, 'parent', None)
-		keys = list(keys)
-		keys.sort()
+		keys = sorted(keys)
 		return keys
 
 	def __str__(self):
@@ -74,7 +73,7 @@ class ConfigSet(object):
 		try:
 			while 1:
 				x = self.table.get(key, None)
-				if not x is None:
+				if x is not None:
 					return x
 				self = self.parent
 		except AttributeError:
@@ -100,10 +99,7 @@ class ConfigSet(object):
 				conf.env.value
 				conf.env['value']
 		"""
-		if name in self.__slots__:
-			return object.__getattr__(self, name)
-		else:
-			return self[name]
+		return object.__getattr__(self, name) if name in self.__slots__ else self[name]
 
 	def __setattr__(self, name, value):
 		"""
@@ -192,10 +188,7 @@ class ConfigSet(object):
 		except KeyError:
 			try: value = self.parent[key]
 			except AttributeError: value = []
-			if isinstance(value, list):
-				value = value[:]
-			else:
-				value = [value]
+			value = value[:] if isinstance(value, list) else [value]
 		else:
 			if not isinstance(value, list):
 				value = [value]
@@ -260,7 +253,7 @@ class ConfigSet(object):
 			except AttributeError: break
 		merged_table = {}
 		for table in table_list:
-			merged_table.update(table)
+			merged_table |= table
 		return merged_table
 
 	def store(self, filename):
@@ -275,19 +268,16 @@ class ConfigSet(object):
 		except OSError:
 			pass
 
-		buf = []
 		merged_table = self.get_merged_dict()
-		keys = list(merged_table.keys())
-		keys.sort()
-
+		keys = sorted(merged_table.keys())
 		try:
 			fun = ascii
 		except NameError:
 			fun = repr
 
-		for k in keys:
-			if k != 'undo_stack':
-				buf.append('%s = %s\n' % (k, fun(merged_table[k])))
+		buf = [
+		    '%s = %s\n' % (k, fun(merged_table[k])) for k in keys if k != 'undo_stack'
+		]
 		Utils.writef(filename, ''.join(buf))
 
 	def load(self, filename):
@@ -302,7 +292,7 @@ class ConfigSet(object):
 		for m in re_imp.finditer(code):
 			g = m.group
 			tbl[g(2)] = eval(g(3))
-		Logs.debug('env: %s' % str(self.table))
+		Logs.debug(f'env: {str(self.table)}')
 
 	def update(self, d):
 		"""

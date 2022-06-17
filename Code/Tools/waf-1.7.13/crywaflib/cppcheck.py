@@ -111,26 +111,28 @@ lock = threading.Lock()
 g_printed_messages = {}
 class cppcheck(Task):
 	
-	def scan(task):
+	def scan(self):
 		try:
-			incn = task.generator.includes_nodes
+			incn = self.generator.includes_nodes
 		except AttributeError:
-			raise Errors.WafError('%r is missing a feature such as "c", "cxx" or "includes": ' % task.generator)
+			raise Errors.WafError(
+			    '%r is missing a feature such as "c", "cxx" or "includes": ' %
+			    self.generator)
 		incn_new = []
-		
+
 		# For CppCheck, only probe engine files, don't track deps for 3rdParty
 		for i in incn:
-			if task.generator.bld.CreateRootRelativePath('Code/SDKs') in i.abspath():
+			if self.generator.bld.CreateRootRelativePath('Code/SDKs') in i.abspath():
 				continue
-			if task.generator.bld.CreateRootRelativePath('Code/Tools') in i.abspath():
+			if self.generator.bld.CreateRootRelativePath('Code/Tools') in i.abspath():
 				continue
 			incn_new.append(i)
-				
+
 		nodepaths = [x for x in incn_new if x.is_child_of(x.ctx.srcnode) or x.is_child_of(x.ctx.bldnode)]
-			
-		tmp = dumb_parser(nodepaths)	
-		tmp.start(task.inputs[0], task.env)
-			
+
+		tmp = dumb_parser(nodepaths)
+		tmp.start(self.inputs[0], self.env)
+
 		return (tmp.nodes, tmp.names)
 	
 	def run(self):

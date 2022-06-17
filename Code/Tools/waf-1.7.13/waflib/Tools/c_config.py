@@ -142,56 +142,54 @@ def parse_flags(self, line, uselib_store, env=None, force_static=False):
 		st = x[:2]
 		ot = x[2:]
 
-		if st == '-I' or st == '/I':
+		if st in ['-I', '/I']:
 			if not ot: ot = lst.pop(0)
-			appu('INCLUDES_' + uselib, [ot])
+			appu(f'INCLUDES_{uselib}', [ot])
 		elif st == '-include':
 			tmp = [x, lst.pop(0)]
 			app('CFLAGS', tmp)
 			app('CXXFLAGS', tmp)
 		elif st == '-D' or (env.CXX_NAME == 'msvc' and st == '/D'): # not perfect but..
 			if not ot: ot = lst.pop(0)
-			app('DEFINES_' + uselib, [ot])
+			app(f'DEFINES_{uselib}', [ot])
 		elif st == '-l':
 			if not ot: ot = lst.pop(0)
-			prefix = force_static and 'STLIB_' or 'LIB_'
+			prefix = 'STLIB_' if force_static else 'LIB_'
 			appu(prefix + uselib, [ot])
 		elif st == '-L':
 			if not ot: ot = lst.pop(0)
-			appu('LIBPATH_' + uselib, [ot])
+			appu(f'LIBPATH_{uselib}', [ot])
 		elif x.startswith('/LIBPATH:'):
-			appu('LIBPATH_' + uselib, [x.replace('/LIBPATH:', '')])
+			appu(f'LIBPATH_{uselib}', [x.replace('/LIBPATH:', '')])
 		elif x == '-pthread' or x.startswith('+') or x.startswith('-std'):
-			app('CFLAGS_' + uselib, [x])
-			app('CXXFLAGS_' + uselib, [x])
-			app('LINKFLAGS_' + uselib, [x])
+			app(f'CFLAGS_{uselib}', [x])
+			app(f'CXXFLAGS_{uselib}', [x])
+			app(f'LINKFLAGS_{uselib}', [x])
 		elif x == '-framework':
-			appu('FRAMEWORK_' + uselib, [lst.pop(0)])
+			appu(f'FRAMEWORK_{uselib}', [lst.pop(0)])
 		elif x.startswith('-F'):
-			appu('FRAMEWORKPATH_' + uselib, [x[2:]])
+			appu(f'FRAMEWORKPATH_{uselib}', [x[2:]])
 		elif x.startswith('-Wl'):
-			app('LINKFLAGS_' + uselib, [x])
+			app(f'LINKFLAGS_{uselib}', [x])
 		elif x.startswith('-m') or x.startswith('-f') or x.startswith('-dynamic'):
-			app('CFLAGS_' + uselib, [x])
-			app('CXXFLAGS_' + uselib, [x])
+			app(f'CFLAGS_{uselib}', [x])
+			app(f'CXXFLAGS_{uselib}', [x])
 		elif x.startswith('-bundle'):
-			app('LINKFLAGS_' + uselib, [x])
+			app(f'LINKFLAGS_{uselib}', [x])
 		elif x.startswith('-undefined'):
 			arg = lst.pop(0)
-			app('LINKFLAGS_' + uselib, [x, arg])
+			app(f'LINKFLAGS_{uselib}', [x, arg])
 		elif x.startswith('-arch') or x.startswith('-isysroot'):
 			tmp = [x, lst.pop(0)]
-			app('CFLAGS_' + uselib, tmp)
-			app('CXXFLAGS_' + uselib, tmp)
-			app('LINKFLAGS_' + uselib, tmp)
+			app(f'CFLAGS_{uselib}', tmp)
+			app(f'CXXFLAGS_{uselib}', tmp)
+			app(f'LINKFLAGS_{uselib}', tmp)
 		elif x.endswith('.a') or x.endswith('.so') or x.endswith('.dylib') or x.endswith('.lib'):
-			appu('LINKFLAGS_' + uselib, [x]) # not cool, #762
+			appu(f'LINKFLAGS_{uselib}', [x])
 
 @conf
 def ret_msg(self, f, kw):
-	if isinstance(f, str):
-		return f
-	return f(kw)
+	return f if isinstance(f, str) else f(kw)
 
 @conf
 def validate_cfg(self, kw):
@@ -208,24 +206,24 @@ def validate_cfg(self, kw):
 	:param errmsg: message to display in case of error
 	:type errmsg: string
 	"""
-	if not 'path' in kw:
+	if 'path' not in kw:
 		if not self.env.PKGCONFIG:
 			self.find_program('pkg-config', var='PKGCONFIG')
 		kw['path'] = self.env.PKGCONFIG
 
 	# pkg-config version
 	if 'atleast_pkgconfig_version' in kw:
-		if not 'msg' in kw:
+		if 'msg' not in kw:
 			kw['msg'] = 'Checking for pkg-config version >= %r' % kw['atleast_pkgconfig_version']
 		return
 
-	if not 'okmsg' in kw:
+	if 'okmsg' not in kw:
 		kw['okmsg'] = 'yes'
-	if not 'errmsg' in kw:
+	if 'errmsg' not in kw:
 		kw['errmsg'] = 'not found'
 
 	if 'modversion' in kw:
-		if not 'msg' in kw:
+		if 'msg' not in kw:
 			kw['msg'] = 'Checking for %r version' % kw['modversion']
 		return
 
@@ -233,14 +231,14 @@ def validate_cfg(self, kw):
 	for x in cfg_ver.keys():
 		y = x.replace('-', '_')
 		if y in kw:
-			if not 'package' in kw:
-				raise ValueError('%s requires a package' % x)
+			if 'package' not in kw:
+				raise ValueError(f'{x} requires a package')
 
-			if not 'msg' in kw:
+			if 'msg' not in kw:
 				kw['msg'] = 'Checking for %r %s %s' % (kw['package'], cfg_ver[x], kw[y])
 			return
 
-	if not 'msg' in kw:
+	if 'msg' not in kw:
 		kw['msg'] = 'Checking for %r' % (kw['package'] or kw['path'])
 
 @conf
@@ -568,15 +566,12 @@ def post_check(self, *k, **kw):
 	"Set the variables after a test executed in :py:func:`waflib.Tools.c_config.check` was run successfully"
 
 	is_success = 0
-	if kw['execute']:
-		if kw['success'] is not None:
-			if kw.get('define_ret', False):
-				is_success = kw['success']
-			else:
-				is_success = (kw['success'] == 0)
-	else:
+	if (kw['execute'] and kw['success'] is not None
+	    and kw.get('define_ret', False)):
+		is_success = kw['success']
+	elif (kw['execute'] and kw['success'] is not None
+	      and not kw.get('define_ret', False) or not kw['execute']):
 		is_success = (kw['success'] == 0)
-
 	if 'define_name' in kw:
 		# TODO simplify?
 		if 'header_name' in kw or 'function_name' in kw or 'type_name' in kw or 'fragment' in kw:
@@ -587,9 +582,8 @@ def post_check(self, *k, **kw):
 		else:
 			self.define_cond(kw['define_name'], is_success)
 
-	if 'header_name' in kw:
-		if kw.get('auto_add_header_name', False):
-			self.env.append_value(INCKEYS, Utils.to_list(kw['header_name']))
+	if 'header_name' in kw and kw.get('auto_add_header_name', False):
+		self.env.append_value(INCKEYS, Utils.to_list(kw['header_name']))
 
 	if is_success and 'uselib_store' in kw:
 		from waflib.Tools import ccroot
@@ -609,7 +603,7 @@ def post_check(self, *k, **kw):
 				# remove trailing slash
 				if isinstance(val, str):
 					val = val.rstrip(os.path.sep)
-				self.env.append_unique(k + '_' + kw['uselib_store'], val)
+				self.env.append_unique(f'{k}_' + kw['uselib_store'], val)
 	return is_success
 
 @conf
@@ -766,13 +760,12 @@ def run_c_code(self, *k, **kw):
 
 	ret = -1
 	try:
-		try:
-			bld.compile()
-		except Errors.WafError:
-			ret = 'Test does not build: %s' % Utils.ex_stack()
-			self.fatal(ret)
-		else:
-			ret = getattr(bld, 'retval', 0)
+		bld.compile()
+	except Errors.WafError:
+		ret = f'Test does not build: {Utils.ex_stack()}'
+		self.fatal(ret)
+	else:
+		ret = getattr(bld, 'retval', 0)
 	finally:
 		# cache the results each time
 		proj = ConfigSet.ConfigSet()
@@ -816,13 +809,13 @@ def define(self, key, val, quote=True):
 	elif val in (False, None):
 		val = 0
 
-	if isinstance(val, int) or isinstance(val, float):
+	if isinstance(val, (int, float)):
 		s = '%s=%s'
 	else:
-		s = quote and '%s="%s"' or '%s=%s'
+		s = '%s="%s"' if quote else '%s=%s'
 	app = s % (key, str(val))
 
-	ban = key + '='
+	ban = f'{key}='
 	lst = self.env['DEFINES']
 	for x in lst:
 		if x.startswith(ban):
@@ -843,7 +836,7 @@ def undefine(self, key):
 	"""
 	assert key and isinstance(key, str)
 
-	ban = key + '='
+	ban = f'{key}='
 	lst = [x for x in self.env['DEFINES'] if not x.startswith(ban)]
 	self.env['DEFINES'] = lst
 	self.env.append_unique(DEFKEYS, key)
@@ -881,11 +874,8 @@ def is_defined(self, key):
 	"""
 	assert key and isinstance(key, str)
 
-	ban = key + '='
-	for x in self.env['DEFINES']:
-		if x.startswith(ban):
-			return True
-	return False
+	ban = f'{key}='
+	return any(x.startswith(ban) for x in self.env['DEFINES'])
 
 @conf
 def get_define(self, key):
@@ -896,11 +886,9 @@ def get_define(self, key):
 	"""
 	assert key and isinstance(key, str)
 
-	ban = key + '='
-	for x in self.env['DEFINES']:
-		if x.startswith(ban):
-			return x[len(ban):]
-	return None
+	ban = f'{key}='
+	return next((x[len(ban):] for x in self.env['DEFINES'] if x.startswith(ban)),
+	            None)
 
 @conf
 def have_define(self, key):
@@ -941,15 +929,17 @@ def write_config_header(self, configfile='', guard='', top=False, env=None, defi
 		Logs.warn('Cannot pass env to write_config_header')
 
 	if not configfile: configfile = WAF_CONFIG_H
-	waf_guard = guard or 'W_%s_WAF' % Utils.quote_define_name(configfile)
+	waf_guard = guard or f'W_{Utils.quote_define_name(configfile)}_WAF'
 
 	node = top and self.bldnode or self.path.get_bld()
 	node = node.make_node(configfile)
 	node.parent.mkdir()
 
-	lst = ['/* WARNING! All changes made to this file will be lost! */\n']
-	lst.append('#ifndef %s\n#define %s\n' % (waf_guard, waf_guard))
-	lst.append(self.get_config_header(defines, headers, define_prefix=define_prefix))
+	lst = [
+	    '/* WARNING! All changes made to this file will be lost! */\n',
+	    '#ifndef %s\n#define %s\n' % (waf_guard, waf_guard),
+	    self.get_config_header(defines, headers, define_prefix=define_prefix),
+	]
 	lst.append('\n#endif /* %s */\n' % waf_guard)
 
 	node.write('\n'.join(lst))
@@ -979,16 +969,14 @@ def get_config_header(self, defines=True, headers=False, define_prefix=''):
 	"""
 	lst = []
 	if headers:
-		for x in self.env[INCKEYS]:
-			lst.append('#include <%s>' % x)
-
+		lst.extend(f'#include <{x}>' for x in self.env[INCKEYS])
 	if defines:
 		for x in self.env[DEFKEYS]:
 			if self.is_defined(x):
 				val = self.get_define(x)
-				lst.append('#define %s %s' % (define_prefix + x, val))
+				lst.append(f'#define {define_prefix + x} {val}')
 			else:
-				lst.append('/* #undef %s */' % (define_prefix + x))
+				lst.append(f'/* #undef {define_prefix + x} */')
 	return "\n".join(lst)
 
 @conf
@@ -1132,8 +1120,7 @@ def get_xlc_version(conf, cc):
 	# the intention is to catch the 8.0 in "IBM XL C/C++ Enterprise Edition V8.0 for AIX..."
 	for v in (r"IBM XL C/C\+\+.* V(?P<major>\d*)\.(?P<minor>\d*)",):
 		version_re = re.compile(v, re.I).search
-		match = version_re(out or err)
-		if match:
+		if match := version_re(out or err):
 			k = match.groupdict()
 			conf.env['CC_VERSION'] = (k['major'], k['minor'])
 			break
@@ -1154,8 +1141,7 @@ def get_suncc_version(conf, cc):
 	version = version.split('\n')[0]
 
 	version_re = re.compile(r'cc:\s+sun\s+(c\+\+|c)\s+(?P<major>\d*)\.(?P<minor>\d*)', re.I).search
-	match = version_re(version)
-	if match:
+	if match := version_re(version):
 		k = match.groupdict()
 		conf.env['CC_VERSION'] = (k['major'], k['minor'])
 	else:

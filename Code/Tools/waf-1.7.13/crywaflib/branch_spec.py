@@ -17,13 +17,12 @@ from waf_branch_spec import CONFIGURATIONS
 import itertools
 import sys, os
 #############################################################################	
-@conf 
+@conf
 def get_recode_license_key(self):
 	key = ''
 	try:
-		fd = open(os.path.normpath(RECODE_LICENSE_PATH), 'r')
-		key = fd.read().strip()
-		fd.close()
+		with open(os.path.normpath(RECODE_LICENSE_PATH), 'r') as fd:
+			key = fd.read().strip()
 	except:
 		pass
 	return key
@@ -47,9 +46,9 @@ def get_project_output_folder(self):
 	return project_folder_node
 
 #############################################################################	
-@conf 
+@conf
 def get_solution_name(self):
-	return self.options.visual_studio_solution_folder + '/' + self.options.visual_studio_solution_name + '.sln'
+	return f'{self.options.visual_studio_solution_folder}/{self.options.visual_studio_solution_name}.sln'
 
 #############################################################################	
 #############################################################################	
@@ -85,11 +84,8 @@ def get_supported_platforms(self):
 #############################################################################	
 @conf
 def set_supported_platforms(self, platforms):
-	host = Utils.unversioned_sys_platform()	
-	if isinstance(platforms,list):
-		PLATFORMS[host] = platforms
-	else:
-		PLATFORMS[host] = [platforms]
+	host = Utils.unversioned_sys_platform()
+	PLATFORMS[host] = platforms if isinstance(platforms,list) else [platforms]
 	
 #############################################################################	
 @conf
@@ -103,9 +99,9 @@ def get_project_vs_filter(self, target):
 	if not hasattr(self, 'vs_project_filters'):
 		self.fatal('vs_project_filters not initialized')
 
-	if not target in self.vs_project_filters:
-		self.fatal('No visual studio filter entry found for %s' % target)
-		
+	if target not in self.vs_project_filters:
+		self.fatal(f'No visual studio filter entry found for {target}')
+
 	return self.vs_project_filters[target]
 	
 #############################################################################
@@ -120,8 +116,7 @@ from collections import Iterable
 def _flatten(coll):
 	for i in coll:
 		if isinstance(i, Iterable) and not isinstance(i, basestring):
-			for subc in _flatten(i):
-				yield subc
+			yield from _flatten(i)
 		else:
 			yield i
 
@@ -148,16 +143,12 @@ def _load_specs(ctx):
 		except Exception as e:
 			ctx.cry_file_error(str(e), file.abspath())	
 
-@conf	
+@conf
 def loaded_specs(ctx):
 	""" Get a list of the names of all specs """
 	_load_specs(ctx)
-	
-	ret = []				
-	for (spec,entry) in ctx.loaded_specs_dict.items():
-		ret.append(spec)
-	
-	return ret
+
+	return [spec for spec, entry in ctx.loaded_specs_dict.items()]
 	
 def _spec_entry_as_single_list(ctx, entry, spec_name = None, platform = None, configuration = None):
 	 return _dict_to_list(_spec_entry_as_dict(ctx, entry, spec_name, platform, configuration))
@@ -174,9 +165,7 @@ def _spec_entry_as_dict(ctx, entry, spec_name = None, platform = None, configura
 		ctx.fatal('[ERROR] Unknown Spec "%s", valid settings are "%s"' % (spec_name, ', '.join(ctx.loaded_specs())))
 
 	def _to_list( value ):
-		if isinstance(value,list):
-			return value
-		return [ value ]		
+		return value if isinstance(value,list) else [ value ]		
 		
 	if hasattr(ctx, 'env'): # The options context is missing an env attribute, hence don't try to find platform settings in this case
 		if not platform:

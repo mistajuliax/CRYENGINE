@@ -56,11 +56,11 @@ def register_hint_attribute_callback(f):
 def _is_user_option_true(value):
 	""" Convert multiple user inputs to True, False or None	"""
 	value = str(value)
-	if value.lower() == 'true' or value.lower() == 't' or value.lower() == 'yes' or value.lower() == 'y' or value.lower() == '1':
+	if value.lower() in {'true', 't', 'yes', 'y', '1'}:
 		return True
-	if value.lower() == 'false' or value.lower() == 'f' or value.lower() == 'no' or value.lower() == 'n' or value.lower() == '0':
+	if value.lower() in {'false', 'f', 'no', 'n', '0'}:
 		return False
-		
+
 	return None
 	
 def _is_user_input_allowed(ctx, option_name, value):
@@ -70,7 +70,9 @@ def _is_user_input_allowed(ctx, option_name, value):
 		if value != '':
 			return False # If we have a valid default value, keep it without user input
 		else:
-			ctx.fatal('No valid default value for %s, please provide a valid input on the command line' % option_name)
+			ctx.fatal(
+			    f'No valid default value for {option_name}, please provide a valid input on the command line'
+			)
 
 	return True
 	
@@ -80,8 +82,8 @@ def _get_string_value(ctx, msg, value):
 	msg += ' '
 	while len(msg) < 53:
 		msg += ' '
-	msg += '['+value+']: '
-	
+	msg += f'[{value}]: '
+
 	user_input = raw_input(msg)
 	if user_input == '':	# No input -> return default
 		return value
@@ -93,19 +95,19 @@ def _get_boolean_value(ctx, msg, value):
 	msg += ' '
 	while len(msg) < 53:
 		msg += ' '
-	msg += '['+value+']: '
-	
+	msg += f'[{value}]: '
+
 	while True:
 		user_input = raw_input(msg)
-		
+
 		# No input -> return default
 		if user_input == '':	
 			return value
-			
+
 		ret_val = _is_user_option_true(user_input)
 		if ret_val != None:
 			return str(ret_val)
-			
+
 		Logs.warn('Unknown input "%s"\n Acceptable values (none case sensitive):' % user_input)
 		Logs.warn("True : 'true'/'t' or 'yes'/'y' or '1'")
 		Logs.warn("False: 'false'/'f' or 'no'/'n' or '0'")
@@ -163,12 +165,12 @@ def _validate_incredibuild_registry_settings(ctx):
 			Logs.warn('[WARNING] Cannot find a registry entry for "HKEY_LOCAL_MACHINE\\Software\\Wow6432Node\\Xoreax\\Incredibuild\\Builder\\%s"' % setting_name )
 
 		# Do we have the right value?
-		if str(data) != required_value:		
+		if str(data) != required_value:	
 
 			if not allowUserInput: # Dont try anything if no input is allowed
 				Logs.warn('[WARNING] "HKEY_LOCAL_MACHINE\\Software\\Wow6432Node\\Xoreax\\Incredibuild\\Builder\\%s" set to "%s" but should be "%s"; run WAF outside of Visual Studio to fix automatically' % (setting_name, data, required_value) )
 				return
-			
+
 			try: # Try to open the registry for writing
 				IB_settings_writing = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, "Software\\Wow6432Node\\Xoreax\\Incredibuild\\Builder", 0,  _winreg.KEY_SET_VALUE |  _winreg.KEY_READ)
 			except:
@@ -181,7 +183,7 @@ def _validate_incredibuild_registry_settings(ctx):
 			else:
 				info_str = [('Should WAF change "HKEY_LOCAL_MACHINE\\Software\\Wow6432Node\\Xoreax\\Incredibuild\\Builder\\%s" from "%s" to "%s"?' % (setting_name, data, required_value) )]
 			info_str.append(desc)
-			
+
 			# Get user choice
 			if not ctx.is_option_true('console_mode'): # gui
 				retVal = 'True' if ctx.gui_get_choice('\n'.join(info_str)) else 'False'
@@ -189,7 +191,7 @@ def _validate_incredibuild_registry_settings(ctx):
 				Logs.info('\n'.join(info_str))
 				retVal = _get_boolean_value(ctx, 'Input', 'Yes')		
 
-			if retVal == 'True' or retVal == 'Yes':
+			if retVal in ['True', 'Yes']:
 				_winreg.SetValueEx(IB_settings_writing, setting_name,0, type, str(required_value))
 			else:
 				Logs.warn('[WARNING] WAF is running with "unsupported" IncrediBuild settings. Expect to encounter IncrediBuild errors during compilation.')
@@ -204,8 +206,8 @@ def _incredibuild_disclaimer(ctx):
 		return
 	Logs.info('\nWAF is using Incredibuild for distributed Builds')
 	Logs.info('To be able to compile with WAF, various licenses are required:')
-	Logs.info('The ' + ib_lic_win + ' Extension Package is always needed')
-	Logs.info('The ' + ib_lic_ps4 + ' Extension Package is needed for PS4 Builds')
+	Logs.info(f'The {ib_lic_win} Extension Package is always needed')
+	Logs.info(f'The {ib_lic_ps4} Extension Package is needed for PS4 Builds')
 	#Logs.info('The ' + ib_lic_xb1 + ' Extension Package is needed for Xbox One Builds')
 	Logs.info('If some packages are missing, please ask IT')
 	Logs.info('to assign the needed ones to your machine')
@@ -220,11 +222,11 @@ def _verify_incredibuild_licence(licence_name, platform_name):
 	except:
 		error = '[ERROR] Incredibuild not found on system'
 		return False, "", error
-	
-	if not licence_name in result:
+
+	if licence_name not in result:
 		error = '[ERROR] Incredibuild on "%s" Disabled - Missing IB licence: "%s"' % (platform_name, licence_name)
 		return False, "", error
-		
+
 	return True,"", ""
 
 @register_attribute_callback	
@@ -250,18 +252,15 @@ def use_incredibuild_win(ctx, section_name, option_name, value):
 	""" IB uses Make && Build Tools also for MSVC Builds, hence we can skip a check here """
 	if LOADED_OPTIONS.get('use_incredibuild', 'False') == 'False':
 		return 'False'
-		
+
 	return 'True'
 
 
-@register_attribute_callback	
+@register_attribute_callback
 def support_recode(ctx, section_name, option_name, value):
 	""" Configure whether recode is supported """
 
-	if not ctx.get_recode_license_key():
-		return False
-
-	return value
+	return value if ctx.get_recode_license_key() else False
 
 
 @register_verify_attribute_callback
@@ -337,11 +336,11 @@ def verify_auto_run_bootstrap(ctx, option_name, value):
 	res = False
 	warning = ""
 	error = ""
-	
+
 	if not _is_user_option_true(value):
 		res = True
 		return (res, warning, error)
-	
+
 	try:
 		subprocess.check_output(['p4']) # use check output as we do not want to spam the waf cmd window
 		res = True
@@ -350,10 +349,6 @@ def verify_auto_run_bootstrap(ctx, option_name, value):
 		# All we want to check here is that p4 exists.
 		# Hence this is valid
 		res = True
-	except:
-		error = "[ERROR] Unable to execute 'p4'"
-		res = False
-		
 	return (res, warning, error)
 
 @register_verify_attribute_callback
@@ -361,12 +356,12 @@ def verify_bootstrap_dat_file(ctx, option_name, value):
 	""" Verify bootstrap dat file """
 	res = True
 	error = ""
-	
+
 	node = ctx.root.make_node(Context.launch_dir).make_node(value)
 	if not os.path.exists(node.abspath()):
 		error = 'Could not find Bootstrap.dat file: "%s"' % node.abspath()
 		res = False
-	
+
 	return (res,"", error)
 
 @Utils.run_once
@@ -380,41 +375,42 @@ def _validate_auto_detect_compiler(ctx):
 		setattr(ctx.options, 'auto_detect_compiler', 'True')
 
 ###############################################################################
-@register_attribute_callback		
-def specs_to_include_in_project_generation(ctx, section_name, option_name, value):	
+@register_attribute_callback
+def specs_to_include_in_project_generation(ctx, section_name, option_name, value):
 	""" Configure all Specs which should be included in Visual Studio """
 	if LOADED_OPTIONS.get('generate_vs_projects_automatically', 'False') == 'False':
 		return ''
-		
+
 	if not ctx.is_option_true('ask_for_user_input'): # allow null value for specs list
 		return value	
-	
-	info_str = ['Specify which specs to include when generating Visual Studio projects.']
-	info_str.append('Each spec defines a list of dependent project for that modules .')
-	
+
+	info_str = [
+	    'Specify which specs to include when generating Visual Studio projects.',
+	    'Each spec defines a list of dependent project for that modules .',
+	]
 	# GUI
 	if not ctx.is_option_true('console_mode'):
 		return ctx.gui_get_attribute(section_name, option_name, value, '\n'.join(info_str))
-	
+
 	# Console	
 	info_str.append("\nQuick option(s) (separate by comma):")
-	
+
 	spec_list = ctx.loaded_specs()
 	spec_list.sort()
 	for idx , spec in enumerate(spec_list):
-		output = '   %s: %s: ' % (idx, spec)
+		output = f'   {idx}: {spec}: '
 		while len(output) < 25:
 			output += ' '
 		output += ctx.spec_description(spec)
 		info_str.append(output)
-		
+
 	info_str.append("(Press ENTER to keep the current default value shown in [])")
 	Logs.info('\n'.join(info_str))
-	
+
 	while True:
 		specs = _get_string_value(ctx, 'Comma separated spec list', value)		
 		spec_input_list = specs.replace(' ', '').split(',')
-				
+
 		# Replace quick options
 		options_valid = True
 		for spec_idx, spec_name in enumerate(spec_input_list):
@@ -425,23 +421,23 @@ def specs_to_include_in_project_generation(ctx, section_name, option_name, value
 				except:
 					Logs.warn('[WARNING] - Invalid option: "%s"' % option_idx)
 					options_valid = False
-					
+
 		if not options_valid:
 			continue
-					
+
 		specs = ','.join(spec_input_list)	
 		(res, warning, error) = ATTRIBUTE_VERIFICATION_CALLBACKS['verify_specs_to_include_in_project_generation'](ctx, option_name, specs)
-		
+
 		if error:
 			Logs.warn(error)
 			continue
-			
+
 		return specs
 
 
 ###############################################################################
 @register_verify_attribute_callback
-def verify_specs_to_include_in_project_generation(ctx, option_name, value):	
+def verify_specs_to_include_in_project_generation(ctx, option_name, value):
 	""" Configure all Specs which should be included in Visual Studio """	
 	if not value:
 		if not ctx.is_option_true('ask_for_user_input'): # allow null value for specs list
@@ -450,23 +446,22 @@ def verify_specs_to_include_in_project_generation(ctx, option_name, value):
 			return (True, "", "")
 		error = ' [ERROR] - Empty spec list not supported'
 		return (False, "", error)
-		
+
 	spec_list =  ctx.loaded_specs()
 	spec_input_list = value.strip().replace(' ', '').split(',')	
-	
+
 	# Get number of occurrences per item in list
 	num_of_occurrences = Counter(spec_input_list)	
-	
+
 	for input in spec_input_list:
 		# Ensure spec is valid
-		if not input in spec_list:
+		if input not in spec_list:
 			error = ' [ERROR] Unkown spec: "%s".' % input
 			return (False, "", error)
-		# Ensure each spec only exists once in list
-		elif not num_of_occurrences[input] == 1:
+		elif num_of_occurrences[input] != 1:
 			error = ' [ERROR] Multiple occurrences of "%s" in final spec value: "%s"' % (input, value)
 			return (False, "", error)
-		
+
 	return True, "", ""	
 
 
@@ -475,10 +470,7 @@ def verify_specs_to_include_in_project_generation(ctx, option_name, value):
 def hint_specs_to_include_in_project_generation(ctx, section_name, option_name, value):
 	""" Hint list of specs for projection generation """
 	spec_list = sorted(ctx.loaded_specs())
-	desc_list = []
-	
-	for spec in spec_list:
-		desc_list.append(ctx.spec_description(spec))			
+	desc_list = [ctx.spec_description(spec) for spec in spec_list]
 
 	return (spec_list, spec_list, desc_list, "multi")
 
@@ -518,32 +510,32 @@ def get_user_settings_node(ctx):
 	return ctx.root.make_node(Context.launch_dir).make_node('_WAF_/user_settings.options')
 	
 ###############################################################################
-@conf 
-def	load_user_settings(ctx):
+@conf
+def load_user_settings(ctx):
 	""" Apply all loaded options if they are different that the default value, and no cmd line value is presented """
 	global user_settings
 
 	_load_default_settings_file(ctx)
 
-	write_user_settings		= False	
-	user_settings 				= ConfigParser.ConfigParser()	
+	write_user_settings		= False
+	user_settings 				= ConfigParser.ConfigParser()
 	user_setting_file 		= ctx.get_user_settings_node().abspath()
 	new_options   				= {}
-		
+
 	# Load existing user settings
 	if not os.path.exists( user_setting_file ):
 		write_user_settings = True	# No file, hence we need to write it
 	else:
 		user_settings.read( [user_setting_file] )
-		
+
 	# Load settings and check for newly set ones
 	for section_name, settings_list in ctx.default_settings.items():
-		
+
 		# Add not already present sections
 		if not user_settings.has_section(section_name):
 			user_settings.add_section(section_name)
 			write_user_settings = True
-			
+
 		# Iterate over all options in this group
 		for settings in settings_list:
 			option_name 	= settings['attribute']
@@ -557,22 +549,22 @@ def	load_user_settings(ctx):
 				# Add info about newly added option
 				if not new_options.has_key(section_name):
 					new_options[section_name] = []
-				
+
 				new_options[section_name].append(option_name)
-				
+
 				# Load value for current option and stringify it
 				value = settings.get('default_value', '')
 				if getattr(ctx.options, option_name) != value:
 					value = getattr(ctx.options, option_name)
-					
+
 				if not isinstance(value, str):
 					value = str(value)
-					
+
 				if	ATTRIBUTE_CALLBACKS.get(option_name, None):					
 					value = ATTRIBUTE_CALLBACKS[option_name](ctx, section_name, settings['attribute'], value)
-				
+
 				(isValid, warning, error) = ctx.verify_settings_option(option_name, value)
-								
+
 				# Add option
 				if isValid:
 					user_settings.set( section_name, settings['attribute'], str(value) )
@@ -582,7 +574,7 @@ def	load_user_settings(ctx):
 			# Check for settings provided by the cmd line
 			long_form			= settings['long_form']
 			short_form		= settings.get('short_form', None)
-			
+
 			# Settings on cmdline should have priority, do a sub string match to batch both --option=<SomeThing> and --option <Something>			
 			bOptionSetOnCmdLine = False
 			for arg in sys.argv:
@@ -595,7 +587,7 @@ def	load_user_settings(ctx):
 					bOptionSetOnCmdLine = True
 					value = getattr(ctx.options, option_name)
 					break
-					
+
 			# Remember option for internal processing
 			if bOptionSetOnCmdLine:
 				LOADED_OPTIONS[ option_name ] = value			
@@ -611,27 +603,23 @@ def	load_user_settings(ctx):
 				user_settings.remove_section(section)
 				write_user_settings = True
 				continue
-	
+
 			# Check for "option" in default list else remove
 			for option in user_settings.options(section):
-				found_match = False
-				for option_desc in ctx.default_settings[section]: # loop over all option descriptions :(
-					if option_desc['attribute'] == option:
-						found_match = True
-						break						
+				found_match = any(option_desc['attribute'] == option
+				                  for option_desc in ctx.default_settings[section])
 				if not found_match:
 					Logs.warn("[user_settings.options]: Removing entry: \"%s=%s\" from section: \"[%s]\" as it is not part of the supported settings found in default_settings.options" % (option, user_settings.get(section, option), section))
 					user_settings.remove_option(section, option)
 					write_user_settings = True
-		
+
 	# Write user settings
 	if write_user_settings:
 		ctx.save_user_settings(user_settings)
-
   # Verify IB registry settings after loading all options
 	_validate_incredibuild_registry_settings(ctx)
 	_validate_auto_detect_compiler(ctx)
-			
+
 	return (user_settings, new_options)
 
 
@@ -640,10 +628,10 @@ def	load_user_settings(ctx):
 def get_default_settings(ctx, section_name, setting_name):
 	default_value = ""
 	default_description = ""
-	
+
 	if not hasattr(ctx, 'default_settings'):
 		return (default_value, default_description)
-		
+
 	for settings_group, settings_list in ctx.default_settings.items():
 		if settings_group == section_name:
 			for settings in settings_list:
@@ -652,7 +640,7 @@ def get_default_settings(ctx, section_name, setting_name):
 					default_description = settings.get('description', '')
 					break
 			break
-	
+
 	return (default_value, default_description)
 
 
@@ -667,7 +655,7 @@ def	save_user_settings(ctx, config_parser):
 ###############################################################################
 @conf
 def verify_settings_option(ctx, option_name, value):		
-	verify_fn_name = "verify_" + option_name	
+	verify_fn_name = f"verify_{option_name}"
 	if ATTRIBUTE_VERIFICATION_CALLBACKS.get(verify_fn_name, None):
 		return ATTRIBUTE_VERIFICATION_CALLBACKS[verify_fn_name](ctx, option_name, value)
 	else:
@@ -677,7 +665,7 @@ def verify_settings_option(ctx, option_name, value):
 ###############################################################################
 @conf
 def hint_settings_option(ctx, section_name, option_name, value):		
-	hint_fn_name = "hint_" + option_name
+	hint_fn_name = f"hint_{option_name}"
 	if ATTRIBUTE_HINT_CALLBACKS.get(hint_fn_name, None):
 		return ATTRIBUTE_HINT_CALLBACKS[hint_fn_name](ctx, section_name, option_name, value)
 	else:

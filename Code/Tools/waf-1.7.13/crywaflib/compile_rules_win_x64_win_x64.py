@@ -14,10 +14,10 @@ def check_win_x64_win_x64_installed(conf):
 	# backup env as the calls modify it	
 	env_backup = conf.env
 	conf.env = conf.env.derive()
-		
+
 	conf.load_msvc_compiler(msvc_target, msvc_arch)
-	ret_value = True if conf.env['MSVC_VERSION'] else False
-			
+	ret_value = bool(conf.env['MSVC_VERSION'])
+
 	# restore environment
 	conf.env = env_backup
 	return ret_value

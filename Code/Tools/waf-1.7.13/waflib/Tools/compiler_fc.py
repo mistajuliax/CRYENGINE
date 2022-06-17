@@ -56,11 +56,15 @@ def options(opt):
 	possible_compiler_list = __list_possible_compiler(detected_platform)
 	test_for_compiler = ' '.join(possible_compiler_list)
 	fortran_compiler_opts = opt.add_option_group("Fortran Compiler Options")
-	fortran_compiler_opts.add_option('--check-fortran-compiler',
-			default="%s" % test_for_compiler,
-			help='On this platform (%s) the following Fortran Compiler will be checked by default: "%s"' % (detected_platform, test_for_compiler),
-		dest="check_fc")
+	fortran_compiler_opts.add_option(
+	    '--check-fortran-compiler',
+	    default=f"{test_for_compiler}",
+	    help=
+	    'On this platform (%s) the following Fortran Compiler will be checked by default: "%s"'
+	    % (detected_platform, test_for_compiler),
+	    dest="check_fc",
+	)
 
 	for compiler in test_for_compiler.split():
-		opt.load('%s' % compiler)
+		opt.load(f'{compiler}')
 

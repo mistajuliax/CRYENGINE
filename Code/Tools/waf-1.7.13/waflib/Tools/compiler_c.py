@@ -90,9 +90,14 @@ def options(opt):
 	possible_compiler_list = c_compiler[build_platform in c_compiler and build_platform or 'default']
 	test_for_compiler = ' '.join(possible_compiler_list)
 	cc_compiler_opts = opt.add_option_group("C Compiler Options")
-	cc_compiler_opts.add_option('--check-c-compiler', default="%s" % test_for_compiler,
-		help='On this platform (%s) the following C-Compiler will be checked by default: "%s"' % (build_platform, test_for_compiler),
-		dest="check_c_compiler")
+	cc_compiler_opts.add_option(
+	    '--check-c-compiler',
+	    default=f"{test_for_compiler}",
+	    help=
+	    'On this platform (%s) the following C-Compiler will be checked by default: "%s"'
+	    % (build_platform, test_for_compiler),
+	    dest="check_c_compiler",
+	)
 	for x in test_for_compiler.split():
-		opt.load('%s' % x)
+		opt.load(f'{x}')
 

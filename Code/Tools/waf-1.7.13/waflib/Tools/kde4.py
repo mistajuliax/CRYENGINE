@@ -19,7 +19,7 @@ def apply_msgfmt(self):
 			bld(features='msgfmt', langs='es de fr', appname='myapp', install_path='${KDE4_LOCALE_INSTALL_DIR}')
 	"""
 	for lang in self.to_list(self.langs):
-		node = self.path.find_resource(lang+'.po')
+		node = self.path.find_resource(f'{lang}.po')
 		task = self.create_task('msgfmt', node, node.change_ext('.mo'))
 
 		langname = lang.split('/')
@@ -51,18 +51,19 @@ def configure(self):
 			bld.program(source='main.c', target='app', use='KDECORE KIO KHTML')
 	"""
 	kdeconfig = self.find_program('kde4-config')
-	prefix = self.cmd_and_log('%s --prefix' % kdeconfig).strip()
-	fname = '%s/share/apps/cmake/modules/KDELibsDependencies.cmake' % prefix
+	prefix = self.cmd_and_log(f'{kdeconfig} --prefix').strip()
+	fname = f'{prefix}/share/apps/cmake/modules/KDELibsDependencies.cmake'
 	try: os.stat(fname)
 	except OSError:
-		fname = '%s/share/kde4/apps/cmake/modules/KDELibsDependencies.cmake' % prefix
+		fname = f'{prefix}/share/kde4/apps/cmake/modules/KDELibsDependencies.cmake'
 		try: os.stat(fname)
-		except OSError: self.fatal('could not open %s' % fname)
+		except OSError:
+			self.fatal(f'could not open {fname}')
 
 	try:
 		txt = Utils.readf(fname)
 	except (OSError, IOError):
-		self.fatal('could not read %s' % fname)
+		self.fatal(f'could not read {fname}')
 
 	txt = txt.replace('\\\n', '\n')
 	fu = re.compile('#(.*)\n')

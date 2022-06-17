@@ -30,7 +30,7 @@ def get_vcvarsall_path():
 	return vcvarsall_path
 
 def copy_output(src_file, dst_directory):
-	print('Copying ' + src_file + ' to ' + dst_directory)
+	print(f'Copying {src_file} to {dst_directory}')
 	copy(src_file, dst_directory)
 
 def copy_outputs(src_queries, dst_directory):
@@ -55,7 +55,8 @@ def build(configuration, platform, lib_dir = None, exe_dir = None, portable = Fa
 	if portable:
 		id_platform_flags += '_portable'
 	script_dir = os.path.dirname(os.path.realpath(__file__))
-	build_dir = os.path.join(script_dir, os.pardir, id_platform_flags + '_' + configuration, 'build')
+	build_dir = os.path.join(script_dir, os.pardir,
+	                         f'{id_platform_flags}_{configuration}', 'build')
 
 	if not os.path.exists(build_dir):
 		os.makedirs(build_dir)
@@ -68,7 +69,7 @@ def build(configuration, platform, lib_dir = None, exe_dir = None, portable = Fa
 
 	if platform in ['win32', 'win64']:
 		platform_name = {'win32' : 'Win32', 'win64' : 'Win64'}[platform]
-		
+
 		if platform == 'win64':
 			platform_name = 'x64'
 			generator_suffix = ' Win64'
@@ -85,9 +86,12 @@ def build(configuration, platform, lib_dir = None, exe_dir = None, portable = Fa
 		commands = ['cmake -G "Visual Studio 11' + generator_suffix + '"'+ flags + ' "' + script_dir + '"']
 
 		vcvarsall_path = get_vcvarsall_path()
-		
+
 		commands += ['"' + vcvarsall_path + '"' + vcvarsall_arg]
-		commands += ['msbuild.exe HLSLCrossCompilerProj.sln /p:Configuration=' + configuration_name + ' /p:Platform=' + platform_name]
+		commands += [
+		    f'msbuild.exe HLSLCrossCompilerProj.sln /p:Configuration={configuration_name} /p:Platform='
+		    + platform_name
+		]
 		cmd_line = '&&'.join(commands)
 		p = subprocess.Popen(cmd_line, shell = True)
 		p.wait()

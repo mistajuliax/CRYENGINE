@@ -56,7 +56,7 @@ def gen_create_uber_file_task(tgen):
 
 	uber_file_folder = tgen.bld.bldnode.make_node('uber_files').make_node(tgen.target)
 	uber_file_folder.mkdir()
-	
+
 	# Iterate over all uber files, to collect files per Uber file
 	uber_file_list = getattr(tgen, 'uber_file_list')
 	for (uber_file,project_filter) in uber_file_list.items():
@@ -64,13 +64,12 @@ def gen_create_uber_file_task(tgen):
 			continue # Don't create a uber file for the special NoUberFile name
 		files = []
 		for (k_1,file_list) in project_filter.items():
-			for file in file_list:
-				if file.endswith('.c') or file.endswith('.cpp') or file.endswith('.CPP'):
-					files.append(file)
-
+			files.extend(
+			    file for file in file_list if file.endswith('.c')
+			    or file.endswith('.cpp') or file.endswith('.CPP'))
 		file_nodes = tgen.to_nodes(files)
 		# Create Task to write Uber File
-		tsk = tgen.create_task('gen_uber_file', file_nodes, uber_file_folder.make_node(uber_file) ) 
+		tsk = tgen.create_task('gen_uber_file', file_nodes, uber_file_folder.make_node(uber_file) )
 		setattr( tsk, 'UBER_FILE_FOLDER', uber_file_folder )
 		tsk.pch = getattr(tgen, 'pch')
 					
@@ -78,13 +77,12 @@ class gen_uber_file(Task):
 	color =  'BLUE'	
 		
 	def compute_uber_file(self):
-		lst = []		
+		lst = []
 		uber_file_folder = self.UBER_FILE_FOLDER
-		if not self.pch == '':
+		if self.pch != '':
 			lst += ['#include "%s"\n' % self.pch.replace('.cpp','.h')]
 		lst += ['#include "%s"\n' % node.path_from(uber_file_folder) for node in self.inputs]
-		uber_file_content = ''.join(lst)		
-		return uber_file_content
+		return ''.join(lst)
 		
 	def run(self):
 		uber_file_content = self.compute_uber_file()

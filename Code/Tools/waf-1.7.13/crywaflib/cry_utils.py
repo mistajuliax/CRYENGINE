@@ -15,7 +15,7 @@ def is_option_true(ctx, option_name):
 # Helper functions to handle error and warning output
 @conf
 def cry_error(conf, msg):
-	conf.fatal("error: %s" % msg) 
+	conf.fatal(f"error: {msg}") 
 	
 @conf
 def cry_file_error(conf, msg, filePath, lineNum = 0 ):
@@ -23,22 +23,25 @@ def cry_file_error(conf, msg, filePath, lineNum = 0 ):
 		filePath = filePath.abspath()
 	if not os.path.isabs(filePath):
 		filePath = conf.path.make_node(filePath).abspath()
-	conf.fatal('%s(%s): error: %s' % (filePath, lineNum, msg))
+	conf.fatal(f'{filePath}({lineNum}): error: {msg}')
 	
 @conf
 def cry_warning(conf, msg):
-	Logs.warn("warning: %s" % msg) 
+	Logs.warn(f"warning: {msg}") 
 	
 @conf
 def cry_file_warning(conf, msg, filePath, lineNum = 0 ):
-	Logs.warn('%s(%s): warning: %s.' % (filePath, lineNum, msg))
+	Logs.warn(f'{filePath}({lineNum}): warning: {msg}.')
 	
 #############################################################################
 #############################################################################	
 # Helper functions to json file parsing and validation		
 def _decode_unicode_to_utf8(input):
 	if isinstance(input, dict):
-		return dict((_decode_unicode_to_utf8(key), _decode_unicode_to_utf8(value)) for key, value in input.iteritems())
+		return {
+		    _decode_unicode_to_utf8(key): _decode_unicode_to_utf8(value)
+		    for key, value in input.iteritems()
+		}
 	elif isinstance(input, list):
 		return [_decode_unicode_to_utf8(element) for element in input]
 	elif isinstance(input, unicode):
@@ -57,7 +60,7 @@ def parse_json_file(conf, file_node):
 			key = _decode_unicode_to_utf8(key)
 			val = _decode_unicode_to_utf8(val)
 			if key in result:
-				raise KeyError("Duplicate key specified: %s" % key)
+				raise KeyError(f"Duplicate key specified: {key}")
 			result[key] = val
 		return result
 		
@@ -112,5 +115,5 @@ def save_to_json_file(conf, file_node, data):
 	except Exception as e:
 		line_num = 0
 		exception_str = str(e)
-		
+
 		conf.cry_file_error(exception_str, file_node.abspath(), 0)

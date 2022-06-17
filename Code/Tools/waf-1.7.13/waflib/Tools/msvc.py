@@ -168,14 +168,13 @@ echo LIB=%%LIB%%;%%LIBPATH%%
 		del(env['CL'])
 
 	try:
-		try:
-			conf.cmd_and_log(cxx + ['/help'], env=env)
-		except Exception as e:
-			debug('msvc: get_msvc_version: %r %r %r -> failure' % (compiler, version, target))
-			debug(str(e))
-			conf.fatal('msvc: cannot run the compiler (in get_msvc_version)')
-		else:
-			debug('msvc: get_msvc_version: %r %r %r -> OK', compiler, version, target)
+		conf.cmd_and_log(cxx + ['/help'], env=env)
+	except Exception as e:
+		debug('msvc: get_msvc_version: %r %r %r -> failure' % (compiler, version, target))
+		debug(str(e))
+		conf.fatal('msvc: cannot run the compiler (in get_msvc_version)')
+	else:
+		debug('msvc: get_msvc_version: %r %r %r -> OK', compiler, version, target)
 	finally:
 		conf.env[compiler_name] = ''
 
@@ -215,10 +214,21 @@ def gather_wsdk_versions(conf, versions):
 			targets = []
 			for target,arch in all_msvc_platforms:
 				try:
-					targets.append((target, (arch, conf.get_msvc_version('wsdk', version, '/'+target, os.path.join(path, 'bin', 'SetEnv.cmd')))))
+					targets.append((
+					    target,
+					    (
+					        arch,
+					        conf.get_msvc_version(
+					            'wsdk',
+					            version,
+					            f'/{target}',
+					            os.path.join(path, 'bin', 'SetEnv.cmd'),
+					        ),
+					    ),
+					))
 				except conf.errors.ConfigurationError:
 					pass
-			versions.append(('wsdk ' + version[1:], targets))
+			versions.append((f'wsdk {version[1:]}', targets))
 
 def gather_wince_supported_platforms():
 	"""
@@ -321,7 +331,7 @@ def gather_msvc_targets(conf, versions, version, vc_path):
 		except conf.errors.ConfigurationError:
 			pass
 	if targets:
-		versions.append(('msvc '+ version, targets))
+		versions.append((f'msvc {version}', targets))
 
 @conf
 def gather_wince_targets(conf, versions, version, vc_path, vsvars, supported_platforms):
@@ -337,12 +347,15 @@ def gather_wince_targets(conf, versions, version, vc_path, vsvars, supported_pla
 			except conf.errors.ConfigurationError:
 				continue
 			if os.path.isdir(os.path.join(winCEpath, 'lib', platform)):
-				bindirs = [os.path.join(winCEpath, 'bin', compiler), os.path.join(winCEpath, 'bin', 'x86_'+compiler)] + common_bindirs
+				bindirs = [
+				    os.path.join(winCEpath, 'bin', compiler),
+				    os.path.join(winCEpath, 'bin', f'x86_{compiler}'),
+				] + common_bindirs
 				incdirs = [os.path.join(winCEpath, 'include'), os.path.join(winCEpath, 'atlmfc', 'include'), include]
 				libdirs = [os.path.join(winCEpath, 'lib', platform), os.path.join(winCEpath, 'atlmfc', 'lib', platform), lib]
 				cetargets.append((platform, (platform, (bindirs,incdirs,libdirs))))
 		if cetargets:
-			versions.append((device + ' ' + version, cetargets))
+			versions.append((f'{device} {version}', cetargets))
 
 @conf
 def gather_winphone_targets(conf, versions, version, vc_path, vsvars):
@@ -354,7 +367,7 @@ def gather_winphone_targets(conf, versions, version, vc_path, vsvars):
 		except conf.errors.ConfigurationError as e:
 			pass
 	if targets:
-		versions.append(('winphone '+ version, targets))
+		versions.append((f'winphone {version}', targets))
 
 @conf
 def gather_msvc_versions(conf, versions):
@@ -414,8 +427,7 @@ def gather_icl_versions(conf, versions):
 		targets = []
 		for target,arch in all_icl_platforms:
 			try:
-				if target=='intel64': targetDir='EM64T_NATIVE'
-				else: targetDir=target
+				targetDir = 'EM64T_NATIVE' if target=='intel64' else target
 				Utils.winreg.OpenKey(all_versions,version+'\\'+targetDir)
 				icl_version=Utils.winreg.OpenKey(all_versions,version)
 				path,type=Utils.winreg.QueryValueEx(icl_version,'ProductDir')
@@ -439,8 +451,8 @@ def gather_icl_versions(conf, versions):
 						pass
 			except WindowsError:
 				continue
-		major = version[0:2]
-		versions.append(('intel ' + major, targets))
+		major = version[:2]
+		versions.append((f'intel {major}', targets))
 
 @conf
 def gather_intel_composer_versions(conf, versions):
@@ -470,8 +482,7 @@ def gather_intel_composer_versions(conf, versions):
 		targets = []
 		for target,arch in all_icl_platforms:
 			try:
-				if target=='intel64': targetDir='EM64T_NATIVE'
-				else: targetDir=target
+				targetDir = 'EM64T_NATIVE' if target=='intel64' else target
 				try:
 					defaults = Utils.winreg.OpenKey(all_versions,version+'\\Defaults\\C++\\'+targetDir)
 				except WindowsError:
@@ -492,7 +503,7 @@ def gather_intel_composer_versions(conf, versions):
 				# The intel compilervar_arch.bat is broken when used with Visual Studio Express 2012
 				# http://software.intel.com/en-us/forums/topic/328487
 				compilervars_warning_attr = '_compilervars_warning_key'
-				if version[0:2] == '13' and getattr(conf, compilervars_warning_attr, True):
+				if version[:2] == '13' and getattr(conf, compilervars_warning_attr, True):
 					setattr(conf, compilervars_warning_attr, False)
 					patch_url = 'http://software.intel.com/en-us/forums/topic/328487'
 					compilervars_arch = os.path.join(path, 'bin', 'compilervars_arch.bat')
@@ -508,8 +519,8 @@ def gather_intel_composer_versions(conf, versions):
 								           'is patched. See: %s') % (vs_express_path, compilervars_arch, patch_url))
 			except WindowsError:
 				pass
-		major = version[0:2]
-		versions.append(('intel ' + major, targets))
+		major = version[:2]
+		versions.append((f'intel {major}', targets))
 
 @conf
 def get_msvc_versions(conf):
@@ -547,10 +558,7 @@ def find_lt_names_msvc(self, libname, is_static=False):
 	Win32/MSVC specific code to glean out information from libtool la files.
 	this function is not attached to the task_gen class
 	"""
-	lt_names=[
-		'lib%s.la' % libname,
-		'%s.la' % libname,
-	]
+	lt_names = [f'lib{libname}.la', f'{libname}.la']
 
 	for path in self.env['LIBPATH']:
 		for la in lt_names:
@@ -575,7 +583,7 @@ def find_lt_names_msvc(self, libname, is_static=False):
 					else:
 						return (None, olib, True)
 				else:
-					raise self.errors.WafError('invalid libtool object file: %s' % laf)
+					raise self.errors.WafError(f'invalid libtool object file: {laf}')
 	return (None, None, None)
 
 @conf
@@ -593,32 +601,26 @@ def libname_msvc(self, libname, is_static=False):
 
 	(lt_path, lt_libname, lt_static) = self.find_lt_names_msvc(lib, is_static)
 
-	if lt_path != None and lt_libname != None:
-		if lt_static == True:
-			# file existance check has been made by find_lt_names
-			return os.path.join(lt_path,lt_libname)
+	if lt_path != None and lt_libname != None and lt_static == True:
+		# file existance check has been made by find_lt_names
+		return os.path.join(lt_path,lt_libname)
 
 	if lt_path != None:
 		_libpaths=[lt_path] + self.env['LIBPATH']
 	else:
 		_libpaths=self.env['LIBPATH']
 
-	static_libs=[
-		'lib%ss.lib' % lib,
-		'lib%s.lib' % lib,
-		'%ss.lib' % lib,
-		'%s.lib' %lib,
-		]
+	static_libs = [f'lib{lib}s.lib', f'lib{lib}.lib', f'{lib}s.lib', f'{lib}.lib']
 
-	dynamic_libs=[
-		'lib%s.dll.lib' % lib,
-		'lib%s.dll.a' % lib,
-		'%s.dll.lib' % lib,
-		'%s.dll.a' % lib,
-		'lib%s_d.lib' % lib,
-		'%s_d.lib' % lib,
-		'%s.lib' %lib,
-		]
+	dynamic_libs = [
+	    f'lib{lib}.dll.lib',
+	    f'lib{lib}.dll.a',
+	    f'{lib}.dll.lib',
+	    f'{lib}.dll.a',
+	    f'lib{lib}_d.lib',
+	    f'{lib}_d.lib',
+	    f'{lib}.lib',
+	]
 
 	libnames=static_libs
 	if not is_static:
@@ -627,7 +629,7 @@ def libname_msvc(self, libname, is_static=False):
 	for path in _libpaths:
 		for libn in libnames:
 			if os.path.exists(os.path.join(path, libn)):
-				debug('msvc: lib found: %s' % os.path.join(path,libn))
+				debug(f'msvc: lib found: {os.path.join(path, libn)}')
 				return re.sub('\.lib$', '',libn)
 
 	#if no lib can be found, just return the libname as msvc expects it
@@ -646,10 +648,7 @@ def check_lib_msvc(self, libname, is_static=False, uselib_store=None):
 	if not uselib_store:
 		uselib_store = libname.upper()
 
-	if False and is_static: # disabled
-		self.env['STLIB_' + uselib_store] = [libn]
-	else:
-		self.env['LIB_' + uselib_store] = [libn]
+	self.env[f'LIB_{uselib_store}'] = [libn]
 
 @conf
 def check_libs_msvc(self, libnames, is_static=False):
@@ -856,10 +855,9 @@ def apply_flags_msvc(self):
 
 	is_static = isinstance(self.link_task, ccroot.stlink_task)
 
-	subsystem = getattr(self, 'subsystem', '')
-	if subsystem:
-		subsystem = '/subsystem:%s' % subsystem
-		flags = is_static and 'ARFLAGS' or 'LINKFLAGS'
+	if subsystem := getattr(self, 'subsystem', ''):
+		subsystem = f'/subsystem:{subsystem}'
+		flags = 'ARFLAGS' if is_static else 'LINKFLAGS'
 		self.env.append_value(flags, subsystem)
 
 	if not is_static:
@@ -911,7 +909,7 @@ def exec_response_command(self, cmd, **kw):
 			(fd, tmp) = tempfile.mkstemp()
 			os.write(fd, '\r\n'.join(i.replace('\\', '\\\\') for i in cmd[1:]).encode())
 			os.close(fd)
-			cmd = [program, '@' + tmp]
+			cmd = [program, f'@{tmp}']
 		# no return here, that's on purpose
 		ret = self.generator.bld.exec_command(cmd, **kw)
 	finally:
@@ -952,8 +950,7 @@ def exec_command_msvc(self, *k, **kw):
 	except AttributeError:
 		bld.cwd = kw['cwd'] = bld.variant_dir
 
-	ret = self.exec_response_command(k[0], **kw)
-	return ret
+	return self.exec_response_command(k[0], **kw)
 
 def wrap_class(class_name):
 	"""
@@ -989,11 +986,11 @@ for k in 'c cxx cprogram cxxprogram cshlib cxxshlib cstlib cxxstlib'.split():
 
 def make_winapp(self, family):
 	append = self.env.append_unique
-	append('DEFINES', 'WINAPI_FAMILY=%s' % family)
+	append('DEFINES', f'WINAPI_FAMILY={family}')
 	append('CXXFLAGS', '/ZW')
 	append('CXXFLAGS', '/TP')
 	for lib_path in self.env.LIBPATH:
-		append('CXXFLAGS','/AI%s'%lib_path)
+		append('CXXFLAGS', f'/AI{lib_path}')
 
 @feature('winphoneapp')
 @after_method('process_use')

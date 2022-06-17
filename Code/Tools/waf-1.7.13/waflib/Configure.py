@@ -53,7 +53,7 @@ def download_tool(tool, force=False, ctx=None):
 	"""
 	for x in Utils.to_list(Context.remote_repo):
 		for sub in Utils.to_list(Context.remote_locs):
-			url = '/'.join((x, sub, tool + '.py'))
+			url = '/'.join((x, sub, f'{tool}.py'))
 			try:
 				web = urlopen(url)
 				try:
@@ -66,14 +66,15 @@ def download_tool(tool, force=False, ctx=None):
 				# python 2.3 does not have getcode and throws an exception to fail
 				continue
 			else:
-				tmp = ctx.root.make_node(os.sep.join((Context.waf_dir, 'waflib', 'extras', tool + '.py')))
+				tmp = ctx.root.make_node(
+				    os.sep.join((Context.waf_dir, 'waflib', 'extras', f'{tool}.py')))
 				tmp.write(web.read(), 'wb')
-				Logs.warn('Downloaded %s from %s' % (tool, url))
+				Logs.warn(f'Downloaded {tool} from {url}')
 				download_check(tmp)
 				try:
 					module = Context.load_tool(tool)
 				except Exception:
-					Logs.warn('The tool %s from %s is unusable' % (tool, url))
+					Logs.warn(f'The tool {tool} from {url} is unusable')
 					try:
 						tmp.delete()
 					except Exception:
@@ -173,13 +174,14 @@ class ConfigurationContext(Context.Context):
 		if not out:
 			out = getattr(Context.g_module, Context.OUT, None)
 		if not out:
-			out = Options.lockfile.replace('.lock-waf_%s_' % sys.platform, '').replace('.lock-waf', '')
+			out = Options.lockfile.replace(f'.lock-waf_{sys.platform}_', '').replace(
+			    '.lock-waf', '')
 
 		self.bldnode = (os.path.isabs(out) and self.root or self.path).make_node(out)
 		self.bldnode.mkdir()
 
 		if not os.path.isdir(self.bldnode.abspath()):
-			conf.fatal('Could not create the build directory %s' % self.bldnode.abspath())
+			conf.fatal(f'Could not create the build directory {self.bldnode.abspath()}')
 
 	def execute(self):
 		"""
@@ -187,18 +189,16 @@ class ConfigurationContext(Context.Context):
 		"""		
 		self.init_dirs()
 		Logs.info("[WAF] Executing 'configure'")
-		
+
 		self.cachedir = self.bldnode.make_node(Build.CACHE_DIR)
 		self.cachedir.mkdir()
 
 		path = os.path.join(self.bldnode.abspath(), WAF_CONFIG_LOG)
 		self.logger = Logs.make_logger(path, 'cfg')
 
-		app = getattr(Context.g_module, 'APPNAME', '')
-		if app:
-			ver = getattr(Context.g_module, 'VERSION', '')
-			if ver:
-				app = "%s (%s)" % (app, ver)
+		if app := getattr(Context.g_module, 'APPNAME', ''):
+			if ver := getattr(Context.g_module, 'VERSION', ''):
+				app = f"{app} ({ver})"
 
 		now = time.ctime()
 		pyver = sys.hexversion
@@ -220,10 +220,10 @@ class ConfigurationContext(Context.Context):
 
 		Context.top_dir = self.srcnode.abspath()
 		Context.out_dir = self.bldnode.abspath()
-		
+
 		# import waf branch spec
 		branch_spec_globals = Context.load_branch_spec(Context.top_dir)
-					
+
 		Context.lock_dir = Context.run_dir + os.sep + branch_spec_globals['BINTEMP_FOLDER']
 
 		# this will write a configure lock so that subsequent builds will
@@ -241,13 +241,13 @@ class ConfigurationContext(Context.Context):
 		# Add cry_waf.exe for dependency tracking
 		cry_waf_exe_node = self.path.make_node('cry_waf.exe')
 		self.hash = hash((self.hash, cry_waf_exe_node.read('rb')))
-		self.files.append(os.path.normpath(cry_waf_exe_node.abspath()))		
+		self.files.append(os.path.normpath(cry_waf_exe_node.abspath()))
 		# conf.hash & conf.files hold wscript files paths and hash
 		# (used only by Configure.autoconfig)
 		env['hash'] = self.hash
 		env['files'] = self.files
 		env['environ'] = dict(self.environ)
-			
+
 		env.store(Context.lock_dir + os.sep + Options.lockfile)
 
 	def prepare_env(self, env):
@@ -297,16 +297,16 @@ class ConfigurationContext(Context.Context):
 		if tooldir: 
 			tooldir = Utils.to_list(tooldir)
 			# Assume that whenever we specify a tooldir, we want to track those files
-			cry_waf_lib = self.path.make_node(tooldir).make_node(input + '.py')
+			cry_waf_lib = self.path.make_node(tooldir).make_node(f'{input}.py')
 			self.hash = hash((self.hash, cry_waf_lib.read('rb')))
-			self.files.append(os.path.normpath(cry_waf_lib.abspath()))			
+			self.files.append(os.path.normpath(cry_waf_lib.abspath()))
 		for tool in tools:
 			# avoid loading the same tool more than once with the same functions
 			# used by composite projects
 
 			mag = (tool, id(self.env), funs)
 			if mag in self.tool_cache:
-				self.to_log('(tool %s is already loaded, skipping)' % tool)
+				self.to_log(f'(tool {tool} is already loaded, skipping)')
 				continue
 			self.tool_cache.append(mag)
 
@@ -327,11 +327,9 @@ class ConfigurationContext(Context.Context):
 
 			if funs is not None:
 				self.eval_rules(funs)
-			else:
-				func = getattr(module, 'configure', None)
-				if func:
-					if type(func) is type(Utils.readf): func(self)
-					else: self.eval_rules(func)
+			elif func := getattr(module, 'configure', None):
+				if type(func) is type(Utils.readf): func(self)
+				else: self.eval_rules(func)
 
 			self.tools.append({'tool':tool, 'tooldir':tooldir, 'funs':funs})
 
@@ -462,7 +460,7 @@ def check_waf_version(self, mini='1.6.99', maxi='1.8.0'):
 	:type  maxi: number, tuple or string
 	:param maxi: Maximum allowed version
 	"""
-	self.start_msg('Checking for waf version in %s-%s' % (str(mini), str(maxi)))
+	self.start_msg(f'Checking for waf version in {str(mini)}-{str(maxi)}')
 	ver = Context.HEXVERSION
 	if Utils.num2ver(mini) > ver:
 		self.fatal('waf version should be at least %r (%r found)' % (Utils.num2ver(mini), ver))
@@ -553,7 +551,9 @@ def find_program(self, filename, **kw):
 	self.to_log('find program=%r paths=%r var=%r -> %r' % (filename, path_list, var, ret))
 
 	if not ret:
-		self.fatal(kw.get('errmsg', '') or 'Could not find the program %s' % ','.join(filename))
+		self.fatal(
+		    kw.get('errmsg', '')
+		    or f"Could not find the program {','.join(filename)}")
 
 	if var:
 		self.env[var] = ret

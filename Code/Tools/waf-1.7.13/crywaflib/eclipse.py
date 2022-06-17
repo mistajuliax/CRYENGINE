@@ -13,14 +13,15 @@ def options(opt):
 $ waf configure eclipse
 """
 
+
 import sys, os
 from waflib import Utils, Logs, Context, Options, Build, TaskGen, Scripting
 from xml.dom.minidom import Document
 
 oe_cdt = 'org.eclipse.cdt'
-cdt_mk = oe_cdt + '.make.core'
-cdt_core = oe_cdt + '.core'
-cdt_bld = oe_cdt + '.build.core'
+cdt_mk = f'{oe_cdt}.make.core'
+cdt_core = f'{oe_cdt}.core'
+cdt_bld = f'{oe_cdt}.build.core'
 
 class eclipse(Build.BuildContext):
 	cmd = 'eclipse'
@@ -48,19 +49,19 @@ class eclipse(Build.BuildContext):
 		@param pythonpath Optional project specific python paths
 		"""
 		source_dirs = []
-		cpppath = self.env['CPPPATH']		
+		cpppath = self.env['CPPPATH']
 		Logs.warn('Generating Eclipse CDT project files')
-		
+
 		for g in self.groups:
 			for tg in g:
 				
 				if not isinstance(tg, TaskGen.task_gen):
 					continue
-				
+
 				tg.post()
 				if not getattr(tg, 'link_task', None):
 					continue
-				
+
 				l = Utils.to_list(getattr(tg, "includes", ''))
 				sources = Utils.to_list(getattr(tg, 'source', ''))
 				features = Utils.to_list(getattr(tg, 'features', ''))
@@ -72,18 +73,18 @@ class eclipse(Build.BuildContext):
 				base = os.path.normpath(os.path.join(self.bldnode.name, tg.path.srcpath()))
 
 				if is_cc:
-					sources_dirs = set([src.parent for src in tg.to_nodes(sources)])
+					sources_dirs = {src.parent for src in tg.to_nodes(sources)}
 
 				incnodes = tg.to_incnodes(tg.to_list(getattr(tg, 'includes', [])) + tg.env['INCLUDES'])
-				
+
 				for p in incnodes:
 					path = p.path_from(self.srcnode)
 					workspace_includes.append(path)
 
 					if is_cc and path not in source_dirs:
 						source_dirs.append(path)
-				
-						
+
+
 		project = self.impl_create_project(sys.executable, appname)
 		self.srcnode.make_node('.project').write(project.toprettyxml())
 
@@ -102,16 +103,17 @@ class eclipse(Build.BuildContext):
 		self.add(doc, projectDescription, 'projects')
 		buildSpec = self.add(doc, projectDescription, 'buildSpec')
 		buildCommand = self.add(doc, buildSpec, 'buildCommand')
-		self.add(doc, buildCommand, 'name', oe_cdt + '.managedbuilder.core.genmakebuilder')
+		self.add(doc, buildCommand, 'name',
+		         f'{oe_cdt}.managedbuilder.core.genmakebuilder')
 		self.add(doc, buildCommand, 'triggers', 'clean,full,incremental,')
 		arguments = self.add(doc, buildCommand, 'arguments')
 		# the default make-style targets are overwritten by the .cproject values
 		dictionaries = {
-				cdt_mk + '.contents': cdt_mk + '.activeConfigSettings',
-				cdt_mk + '.enableAutoBuild': 'false',
-				cdt_mk + '.enableCleanBuild': 'true',
-				cdt_mk + '.enableFullBuild': 'true',
-				}
+		    f'{cdt_mk}.contents': f'{cdt_mk}.activeConfigSettings',
+		    f'{cdt_mk}.enableAutoBuild': 'false',
+		    f'{cdt_mk}.enableCleanBuild': 'true',
+		    f'{cdt_mk}.enableFullBuild': 'true',
+		}
 		for k, v in dictionaries.items():
 			self.addDictionary(doc, arguments, k, v)
 
@@ -123,7 +125,7 @@ class eclipse(Build.BuildContext):
 			core.cnature
 		""".split()
 		for n in nature_list:
-			self.add(doc, natures, 'nature', oe_cdt + '.' + n)
+			self.add(doc, natures, 'nature', f'{oe_cdt}.{n}')
 
 		self.add(doc, natures, 'nature', 'org.python.pydev.pythonNature')
 
@@ -261,9 +263,7 @@ class eclipse(Build.BuildContext):
 		prop.setAttribute('name', 'org.python.pydev.PYTHON_PROJECT_VERSION')
 		prop = self.add(doc, pydevproject, 'pydev_property', 'Default')
 		prop.setAttribute('name', 'org.python.pydev.PYTHON_PROJECT_INTERPRETER')
-		# add waf's paths
-		wafadmin = [p for p in system_path if p.find('wafadmin') != -1]
-		if wafadmin:
+		if wafadmin := [p for p in system_path if p.find('wafadmin') != -1]:
 			prop = self.add(doc, pydevproject, 'pydev_pathproperty',
 					{'name':'org.python.pydev.PROJECT_EXTERNAL_SOURCE_PATH'})
 			for i in wafadmin:
@@ -272,7 +272,7 @@ class eclipse(Build.BuildContext):
 			prop = self.add(doc, pydevproject, 'pydev_pathproperty',
 					{'name':'org.python.pydev.PROJECT_SOURCE_PATH'})
 			for i in user_path:
-				self.add(doc, prop, 'path', '/'+appname+'/'+i)
+				self.add(doc, prop, 'path', f'/{appname}/{i}')
 
 		doc.appendChild(pydevproject)
 		return doc
@@ -284,10 +284,16 @@ class eclipse(Build.BuildContext):
 		return dictionary
 
 	def addTarget(self, doc, buildTargets, executable, name, buildTarget, runAllBuilders=True):
-		target = self.add(doc, buildTargets, 'target',
-						{'name': name,
-						 'path': '',
-						 'targetID': oe_cdt + '.build.MakeTargetBuilder'})
+		target = self.add(
+		    doc,
+		    buildTargets,
+		    'target',
+		    {
+		        'name': name,
+		        'path': '',
+		        'targetID': f'{oe_cdt}.build.MakeTargetBuilder',
+		    },
+		)
 		self.add(doc, target, 'buildCommand', executable)
 		self.add(doc, target, 'buildArguments', None)
 		self.add(doc, target, 'buildTarget', buildTarget)

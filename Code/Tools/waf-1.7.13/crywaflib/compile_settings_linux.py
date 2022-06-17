@@ -170,14 +170,17 @@ def add_linux_launcher_script(self):
 
 		for project in self.bld.spec_game_projects():
 			# Set up values for linux launcher script template
-			linux_launcher_script_file = node.make_node('Launch_'+self.bld.get_executable_name(project)+'.sh')
+			linux_launcher_script_file = node.make_node(
+			    f'Launch_{self.bld.get_executable_name(project)}.sh')
 			self.to_launch_executable = self.bld.get_executable_name(project)
 
 			template = compile_template(LAUNCHER_SCRIPT)
 			linux_launcher_script_content = template(self)
 
 			if not os.path.exists(linux_launcher_script_file.abspath()) or linux_launcher_script_file.read() != linux_launcher_script_content:	
-				Logs.info('Updating Linux Launcher Script (%s)' % linux_launcher_script_file.abspath() )
+				Logs.info(
+				    f'Updating Linux Launcher Script ({linux_launcher_script_file.abspath()})'
+				)
 				linux_launcher_script_file.write(linux_launcher_script_content)
 
 
@@ -196,10 +199,10 @@ def debug_info_splitting(self):
 	if not getattr(self, 'link_task', None):
 		return
 
-	if getattr(self, 'link_task', None) and self._type != 'stlib':
+	if self._type != 'stlib':
 		output_folder = self.bld.get_output_folders(platform, configuration)[0]
 		output_node = output_folder.make_node(self.link_task.outputs[0].name)
-		debugnode =output_folder.make_node(output_node.name + '.debug')
+		debugnode = output_folder.make_node(f'{output_node.name}.debug')
 
 		sdi = self.create_task('separate_debug_info', output_node, debugnode)
 

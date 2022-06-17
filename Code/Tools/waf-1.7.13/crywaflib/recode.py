@@ -25,7 +25,7 @@ def convert_waf_platform_to_vs_platform(platform):
 		return 'Durango'
 	if platform == 'orbis':
 		return 'ORBIS'
-	print('to_vs error' + platform)
+	print(f'to_vs error{platform}')
 	return 'UNKNOWN'
 	
 ###############################################################################
@@ -46,9 +46,9 @@ def check_global_recode_enabled(bld):
 
 	###########################################
 	# Only modify env when compiling on a platform supporting recode
-	if  bld.env['PLATFORM'] != 'win_x86' and  bld.env['PLATFORM'] != 'win_x64':
+	if bld.env['PLATFORM'] not in ['win_x86', 'win_x64']:
 		return False
-		
+
 	###########################################
 	# Check global recode setting
 	if not bld.is_option_true('support_recode'):
@@ -61,28 +61,28 @@ def check_global_recode_enabled(bld):
 		recode_install_path = winreg.QueryValueEx(recode_settings, 'InstallDir')[0]
 	except:			
 		return False
-	
+
 	if recode_install_path == '':
 		return False
-		
+
 	bld.recode_install_path = recode_install_path			
-				
+
 	# Add path to env to allow recode to find its DLLs
 	platform = bld.env['PLATFORM']
 	# Make sure we have an env to use
 	for config in bld.get_supported_configurations():
-		if bld.all_envs[ platform + '_' + config ].env == []:	
-			bld.all_envs[ platform + '_' + config ].env = os.environ.copy()
-	
+		if bld.all_envs[f'{platform}_{config}'].env == []:	
+			bld.all_envs[f'{platform}_{config}'].env = os.environ.copy()
+
 	# Figure out path based on platform to append
-	if platform == 'win_x86':		
-		path = ';' + str(recode_install_path) + 'Win32'
-	elif platform == 'win_x64':		
-		path = ';' + str(recode_install_path) + 'x64\\'
-	
+	if platform == 'win_x64':
+		path = f';{str(recode_install_path)}' + 'x64\\'
+
+	elif platform == 'win_x86':
+		path = f';{str(recode_install_path)}Win32'
 	# Now add path to environment
 	for config in bld.get_supported_configurations():
-		bld.all_envs[ platform + '_' + config ].env['PATH'] += path
+		bld.all_envs[f'{platform}_' + config].env['PATH'] += path
 
 	return True		
 		
@@ -91,44 +91,46 @@ def check_global_recode_enabled(bld):
 def check_project_recode_enabled(bld, target):
 	if not bld.is_option_true('support_recode'):
 		return False
-	
+
 	if not bld.enable_recode:
 		return False
-	
+
 	if bld.env['PLATFORM'] == 'project_generator':
 		return False
-		
+
 	if Utils.unversioned_sys_platform() != 'win32':
 		return False
-		
-	recode_file_node = bld.projects_dir.make_node(target + '.vcxproj.recode.user').get_src()		
+
+	recode_file_node = bld.projects_dir.make_node(
+	    f'{target}.vcxproj.recode.user').get_src()
 	if not os.path.exists(recode_file_node.abspath()):		
 		return False
-	
+
 
 	# Get current platform and configuration, take overwrites into account
 	platform 		=  bld.env['PLATFORM']
 	configuration 	=  bld.env['CONFIGURATION']
 	if target in bld.env['CONFIG_OVERWRITES']:
 		configuration = bld.env['CONFIG_OVERWRITES'][target]
-	
+
 	# parse recode user files
 	recode_file = parse(recode_file_node.abspath())
 
 	for node in recode_file.getElementsByTagName('PropertyGroup'):
-		if node.getAttribute('Label') == 'Recode':		
+		if node.getAttribute('Label') == 'Recode':
 			# Check Condition if this is for our current build target
 			# Take config overwrites into account
 			condition = node.getAttribute('Condition')
 
-			if not convert_waf_platform_to_vs_platform(platform) in condition:
+			if convert_waf_platform_to_vs_platform(platform) not in condition:
 				continue
 
-			if not convert_waf_configuration_to_vs_configuration(configuration) in condition:
+			if (convert_waf_configuration_to_vs_configuration(configuration) not in
+			    condition):
 				continue
 
 			return False
-		
+
 
 	# User configs only disable recode, so return True if nothing was found
 	return True
@@ -137,13 +139,13 @@ def check_project_recode_enabled(bld, target):
 @after_method('apply_link')
 def add_recode_compile_flags(self):	
 	platform =  self.env['PLATFORM']
-	if platform != 'win_x86' and platform != 'win_x64':
+	if platform not in ['win_x86', 'win_x64']:
 		return # Recode is only supported on windows targets
 
 	# Check global recode setting
 	if not self.bld.is_option_true('support_recode'):
 		return
-			
+
 	# Patch linker flags if we have a link task
 	if getattr(self, 'link_task', None):
 		patched_linkflags = []
@@ -160,5 +162,5 @@ def add_recode_compile_flags(self):
 				continue
 
 			patched_linkflags.append(flag)			
-		
+
 		self.link_task.env['LINKFLAGS'] = patched_linkflags + [ '/INCREMENTAL' ] + ['/DEBUG']			

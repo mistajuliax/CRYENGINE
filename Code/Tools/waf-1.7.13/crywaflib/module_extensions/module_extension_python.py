@@ -8,7 +8,17 @@ from waflib.CryModuleExtension import module_extension
 @module_extension('python27')
 def module_extensions_python27(ctx, kw, entry_prefix, platform, configuration):
 	
-	kw[entry_prefix + 'defines']  += [ 'USE_PYTHON_SCRIPTING', 'BOOST_PYTHON_STATIC_LIB', 'HAVE_ROUND' ]
-	kw[entry_prefix + 'use']      += [ 'python27' ]
-	kw[entry_prefix + 'includes'] += [ ctx.CreateRootRelativePath('Code/Libs/python'), ctx.CreateRootRelativePath('Code/SDKs/Python27/Include'), ctx.CreateRootRelativePath('Code/SDKs/boost') ]
-	kw[entry_prefix + 'libpath']  += [ ctx.CreateRootRelativePath('Code/SDKs/boost/lib/64bit') ]
+	kw[f'{entry_prefix}defines'] += [
+	    'USE_PYTHON_SCRIPTING',
+	    'BOOST_PYTHON_STATIC_LIB',
+	    'HAVE_ROUND',
+	]
+	kw[f'{entry_prefix}use'] += [ 'python27' ]
+	kw[f'{entry_prefix}includes'] += [
+	    ctx.CreateRootRelativePath('Code/Libs/python'),
+	    ctx.CreateRootRelativePath('Code/SDKs/Python27/Include'),
+	    ctx.CreateRootRelativePath('Code/SDKs/boost'),
+	]
+	kw[f'{entry_prefix}libpath'] += [
+	    ctx.CreateRootRelativePath('Code/SDKs/boost/lib/64bit')
+	]

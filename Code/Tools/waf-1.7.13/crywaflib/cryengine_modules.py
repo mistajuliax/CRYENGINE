@@ -15,9 +15,7 @@ import collections
 
 def _to_list( value ):
 	""" Helper function to ensure a value is always a list """
-	if isinstance(value,list):
-		return value
-	return [ value ]
+	return value if isinstance(value,list) else [ value ]
 
 def _preserved_order_remove_duplicates(seq):
 	seen = set()
@@ -44,16 +42,17 @@ def get_platform_list(self, platform):
 		for concrete_platform in supported_platforms:
 			platform_name = ""
 			for platform_subset in concrete_platform.split('_'):
-				platform_name = '%s_%s' % (platform_name, platform_subset) if platform_name else platform_subset
+				platform_name = (f'{platform_name}_{platform_subset}'
+				                 if platform_name else platform_subset)
 				ret_value.add(platform_name)
 		ret_value = _preserved_order_remove_duplicates(list(ret_value)) # strip duplicate
-		
-	# For the given platform
+
 	else:
 		ret_value = []
 		platform_name = ""
 		for platform_subset in platform.split('_'):
-			platform_name = '%s_%s' % (platform_name, platform_subset) if platform_name else platform_subset
+			platform_name = (f'{platform_name}_{platform_subset}'
+			                 if platform_name else platform_subset)
 			if any(platform_name in s for s in supported_platforms):
 				ret_value += [platform_name]
 
@@ -68,7 +67,7 @@ def SanitizeInput(ctx, kw):
 		Private Helper function to sanitize a single entry
 		"""	
 		assert( isinstance(entry, str) )
-		if not entry in kw:
+		if entry not in kw:
 			kw[entry] = []
 
 		if not isinstance(kw[entry],list):
@@ -106,16 +105,18 @@ def _scan_module_folder(root):
 	root_len = len(root)
 	relative_file_paths = collections.OrderedDict()
 	os_path_join = os.path.join
-	
-	for path, subdirectories, files in os.walk(root):	
+
+	for path, subdirectories, files in os.walk(root):
 		relative_path = path[root_len+1:]
-		
+
 		# Do not parse folders that have a wscript as they define their own modules
 		if relative_path  and 'wscript' in files:
 			continue
-						
-		relative_file_paths[relative_path if relative_path else 'Root'] = [os.path.join(relative_path,file_name) for file_name in files]	
-		
+
+		relative_file_paths[relative_path or 'Root'] = [
+		    os.path.join(relative_path, file_name) for file_name in files
+		]	
+
 	return {"auto_gen_uber.cpp":  relative_file_paths  }
 		
 @Utils.memoize_ignore_first_arg
@@ -127,8 +128,9 @@ def _scan_waf_file(ctx, absolute_file_path):
 		# 1) If item is a file, add to file set for current filter
 		# 2) If item is a filter, recurse call this function
 		def _extract_files_and_filters(parent_uber_file, filter_items, filter_name_prefix):
-			for (child_filter_name, child_filter_items) in filter_items.iteritems():				
-				final_filter_name = (filter_name_prefix + '/' + child_filter_name) if filter_name_prefix else child_filter_name
+			for (child_filter_name, child_filter_items) in filter_items.iteritems():			
+				final_filter_name = (f'{filter_name_prefix}/{child_filter_name}'
+				                     if filter_name_prefix else child_filter_name)
 				filter_file_list = parent_uber_file.setdefault(final_filter_name, set())
 				for entry in child_filter_items:
 					if isinstance(entry, dict):
@@ -149,18 +151,18 @@ def _scan_waf_file(ctx, absolute_file_path):
 	
 def _scan_waf_files(ctx, file_node_list):
 
-	def _merge_file_lists(in_0, in_1):	
+	def _merge_file_lists(in_0, in_1):
 		""" Merge two file lists """
 		result = dict(in_0)
-		
+
 		for (uber_file,project_filter) in in_1.iteritems():
-			for (filter_name,file_list) in project_filter.iteritems():				
-				for file in file_list:				
-					if not uber_file in result:						
-						result[uber_file] = {}					
-					if not filter_name in result[uber_file]:						
-						result[uber_file][filter_name] = []									
-					result[uber_file][filter_name].append(file)	
+			for (filter_name,file_list) in project_filter.iteritems():		
+				for file in file_list:	
+					if uber_file not in result:						
+						result[uber_file] = {}
+					if filter_name not in result[uber_file]:						
+						result[uber_file][filter_name] = []
+					result[uber_file][filter_name].append(file)
 		return result
 
 	final_file_list = {}		
@@ -173,32 +175,32 @@ def _scan_waf_files(ctx, file_node_list):
 def GetModuleFileList(ctx, kw):		
 
 	file_list = {} 
-	
+
 	# Get  files by recursivly scanning the current wscript path
 	if kw.get('auto_detect_files', False):
 		file_list =  _scan_module_folder(ctx.path.abspath())
-		
+
 	target = kw['target']
 	platform = ctx.env['PLATFORM']
 	configuration = ctx.GetConfiguration(target)
-	
+
 	# Read x.waf_file(s)
 	# Get files from xxx.waf_file(s) from file_list entry
 	waf_files = [ctx.path.make_node(waf_file) for waf_file in GetFlattendPlatformSpecificSetting(ctx, kw, 'file_list', platform, configuration)]
 	file_list.update(_scan_waf_files(ctx, waf_files))
-	
+
 	return file_list
 		
 def RegisterVisualStudioFilter(ctx, kw):
 	"""
 	Util-function to register each provided visual studio filter parameter in a central lookup map
 	"""
-	if not 'vs_filter' in kw:
+	if 'vs_filter' not in kw:
 		ctx.fatal('Mandatory "vs_filter" task generater parameter missing in %s/wscript' % ctx.path.abspath())
-		
+
 	if not hasattr(ctx, 'vs_project_filters'):
 		ctx.vs_project_filters = {}
-			
+
 	ctx.vs_project_filters[ kw['target' ] ] = kw['vs_filter']	
 	
 def AssignTaskGeneratorIdx(ctx, kw):
@@ -208,16 +210,16 @@ def AssignTaskGeneratorIdx(ctx, kw):
 	if not hasattr(ctx, 'index_counter'):		ctx.index_counter = 0
 	if not hasattr(ctx, 'index_map'):
 		ctx.index_map = {}
-		
+
 	# Use a path to the wscript and the actual taskgenerator target as a unqiue key
-	key = ctx.path.abspath() + '___' + kw['target']
-	
+	key = f'{ctx.path.abspath()}___' + kw['target']
+
 	if key in ctx.index_map:
 		kw['idx'] = ctx.index_map.get(key)
 	else:
 		ctx.index_counter += 1	
 		kw['idx'] = ctx.index_map[key] = ctx.index_counter
-		
+
 	kw['features'] += ['parse_vcxproj']
 		
 def SetupRunTimeLibraries(ctx, kw, overwrite_settings = None):
@@ -232,28 +234,21 @@ def SetupRunTimeLibraries(ctx, kw, overwrite_settings = None):
 		runtime_crt = 'static'
 	if kw.get('force_dynamic_crt', False):		# Setting per Task Generator
 		runtime_crt = 'dynamic'
-		
-	if runtime_crt != 'static' and runtime_crt != 'dynamic':
+
+	if runtime_crt not in ['static', 'dynamic']:
 		ctx.fatal('Invalid Settings: "%s" for runtime_crt' % runtime_crt )
-		
+
 	crt_flag = []
 	config = ctx.GetConfiguration(kw['target'])			
 
 	if runtime_crt == 'static':
 		kw['defines'] 	+= [ '_MT' ]
 		if ctx.env['CC_NAME'] == 'msvc':
-			if config == 'debug':
-				crt_flag = [ '/MTd' ]
-			else:
-				crt_flag	= [ '/MT' ]			
+			crt_flag = [ '/MTd' ] if config == 'debug' else [ '/MT' ]
 	else: # runtime_crt == 'dynamic':
-		kw['defines'] 	+= [ '_MT', '_DLL' ]	
+		kw['defines'] 	+= [ '_MT', '_DLL' ]
 		if ctx.env['CC_NAME'] == 'msvc':
-			if config == 'debug':
-				crt_flag = [ '/MDd' ]
-			else:
-				crt_flag	= [ '/MD' ]		
-	
+			crt_flag = [ '/MDd' ] if config == 'debug' else [ '/MD' ]
 	kw['cflags']	+= crt_flag
 	kw['cxxflags']	+= crt_flag
 	
@@ -264,15 +259,15 @@ def GetFlattendPlatformSpecificSetting(ctx, kw, entry, platform, configuration):
 	ret_list = list(kw[entry])
 	for setting in kw['additional_settings']:
 		ret_list += setting[entry]
-		
+
 	# Flatten platform specific setting into the list
-	if platform == 'project_generator' and not ctx.cmd == 'generate_uber_files':
+	if platform == 'project_generator' and ctx.cmd != 'generate_uber_files':
 		for key, value in  ctx.GetPlatformSpecificSettings(kw, entry, platform, configuration, True).iteritems():
 			ret_list += value
 		for setting in kw['additional_settings']:
 			for key, value in  ctx.GetPlatformSpecificSettings(setting, entry, platform, configuration, True).iteritems():
 				ret_list += value
-			
+
 	ret_list = _preserved_order_remove_duplicates(ret_list)
 	return ret_list
 	
@@ -285,16 +280,15 @@ def TrackFileListChanges(ctx, kw):
 	target = kw['target']
 	platform = ctx.env['PLATFORM']
 	configuration = ctx.GetConfiguration(target)
-	
-	files_to_track = GetFlattendPlatformSpecificSetting(ctx,kw, 'file_list', platform, configuration)
 
-	if files_to_track:
+	if files_to_track := GetFlattendPlatformSpecificSetting(
+	    ctx, kw, 'file_list', platform, configuration):
 		if not hasattr(ctx, 'addional_files_to_track'):
 			ctx.addional_files_to_track = []	
-			
+
 		# Remove duplicates
 		files_to_track = list(set(files_to_track)) 	
-	
+
 		# Add results to global lists
 		for file in files_to_track:
 			file_node = ctx.path.make_node(file)				
@@ -308,10 +302,11 @@ def LoadFileLists(ctx, kw):
 	Dict[ <UberFile> -> Dict[ <Project Filter> -> List[Files] ] ]
 	"""			
 	def _DisableUberFile(ctx, project_filter_list, files_marked_for_exclusion):
-		for (filter_name, file_list) in project_filter_list.items():				
-			if any(ctx.path.make_node(file).abspath().lower() in files_marked_for_exclusion for file in file_list): # if file in exclusion list			
-				return True
-		return False
+		return any(
+		    any(
+		        ctx.path.make_node(file).abspath().lower() in
+		        files_marked_for_exclusion for file in file_list)
+		    for filter_name, file_list in project_filter_list.items())
 				
 	task_generator_files		= set() # set of all files in this task generator (store as abspath to be case insenstive)
 	
@@ -495,7 +490,7 @@ def InitializeTaskGenerator(ctx, kw):
 target_modules = {}
 def RegisterCryModule(ctx, kw):
 	if 'target' not in kw:
-		Logs.warn('Module in %s does not specify a target' % ctx.path.abspath())
+		Logs.warn(f'Module in {ctx.path.abspath()} does not specify a target')
 		return
 	target_modules[kw['target']] = kw
 	
@@ -505,9 +500,9 @@ def ConfigureModuleUsers(ctx, kw):
 	"""
 	if not hasattr(ctx, 'cry_module_users'):
 		ctx.cry_module_users = {}
-	
-	for lib in kw['use_module']:		
-		if not lib  in ctx.cry_module_users:
+
+	for lib in kw['use_module']:	
+		if lib not in ctx.cry_module_users:
 			ctx.cry_module_users[lib] = []
 		ctx.cry_module_users[lib] += [ kw['target'] ]	
 			
@@ -516,19 +511,19 @@ def LoadAddionalFileSettings(ctx, kw):
 	"""
 	Load all settings from the addional_settings parameter, and store them in a lookup map
 	"""
-	kw['features'] 							+= [ 'apply_additional_settings' ]	
+	kw['features'] 							+= [ 'apply_additional_settings' ]
 	kw['file_specifc_settings'] = {}
-	
+
 	for setting in kw['additional_settings']:
 				
 		setting['target'] = kw['target'] # reuse target name
-								
+
 		file_list = []
-					
+
 		if 'files' in setting:		
 			# Option A: The files are already specified as an list
 			file_list += setting['files']			
-			
+
 		if 'regex' in setting:
 			# Option B: A regex is specifed to match the files			
 			p = re.compile(setting['regex'])
@@ -541,9 +536,9 @@ def LoadAddionalFileSettings(ctx, kw):
 		uber_file_folder = ctx.bldnode.make_node('..')
 		uber_file_folder = uber_file_folder.make_node('uber_files')
 		uber_file_folder = uber_file_folder.make_node(kw['target'])
-			
+
 		for file in file_list:
-			file_abspath 			= ctx.path.make_node(file).abspath()			
+			file_abspath 			= ctx.path.make_node(file).abspath()
 			uber_file_abspath = uber_file_folder.make_node(file).abspath()
 
 			if 'uber_file_lookup' in kw:
@@ -552,11 +547,14 @@ def LoadAddionalFileSettings(ctx, kw):
 					# Uber files are not allowed for additional settings
 					if uber_file_abspath == uber_file:
 						ctx.cry_file_error("To ensure consistent behavior, Additional File Settings are not supported for files in UberFiles - please adjust your setup" % file, ctx.path.make_node('wscript').abspath())
-						
-					for entry in kw['uber_file_lookup'][uber_file]:						
+
+					for entry in kw['uber_file_lookup'][uber_file]:	
 						if file_abspath == entry.abspath():
-							ctx.cry_file_error("To ensure consistent behavior, Additional File Settings are not supported for files using UberFiles (%s) - please adjust your setup" % file, ctx.path.make_node('wscript').abspath())
-							
+							ctx.cry_file_error(
+							    f"To ensure consistent behavior, Additional File Settings are not supported for files using UberFiles ({file}) - please adjust your setup",
+							    ctx.path.make_node('wscript').abspath(),
+							)
+
 			# All fine, add file name to dictonary
 			kw['file_specifc_settings'][file_abspath] = setting
 			setting['source'] = []
@@ -594,13 +592,13 @@ def PostprocessBuildModules(ctx, *k, **kw):
 @conf
 def ApplyPlatformSpecificSettings(ctx, kw, platform, configuration, spec):
 	# First apply spec specific platform entries
-	
-	if platform == 'project_generator' and not ctx.cmd == 'generate_uber_files': # Get info when looping over all projects and configuration 
+
+	if platform == 'project_generator' and ctx.cmd != 'generate_uber_files': # Get info when looping over all projects and configuration 
 		return
-	
-	if not ctx.cmd == 'generate_uber_files': # generate_uber_files files does not know the concept of specs
+
+	if ctx.cmd != 'generate_uber_files': # generate_uber_files files does not know the concept of specs
 		ApplySpecSpecificSettings(ctx, kw, platform, configuration, spec)	
-	
+
 	ApplyPlatformSpecificModuleExtension(ctx, kw, platform, configuration) # apply prior to ApplyPlatformSpecificModuleExtension() as it modifies the entry list on a per platform basis
 	CollectPlatformSpecificSettings(ctx, kw, platform, configuration)	# will flatten all platform specific entries into a single entry (except when in project_generation mode)
 
@@ -612,26 +610,29 @@ def ConfigureTaskGenerator(ctx, kw):
 	spec = ctx.options.project_spec
 	platform = ctx.env['PLATFORM']
 	configuration = ctx.GetConfiguration(target)
-	
+
 	# Apply all settings, based on current platform and configuration
 	ApplyConfigOverwrite(ctx, kw)
-	ctx.ApplyPlatformSpecificSettings(kw, platform, configuration, spec)	
+	ctx.ApplyPlatformSpecificSettings(kw, platform, configuration, spec)
 	ApplyBuildOptionSettings(ctx, kw)
-	
+
 	LoadFileLists(ctx, kw)
-	
+
 	LoadAddionalFileSettings(ctx, kw)
 
 	# Configure the modules users for static libraries
 	ConfigureModuleUsers(ctx,kw)
-		
+
 	# Handle meta includes for WinRT
 	for meta_include in kw.get('meta_includes', []):
-		kw['cxxflags'] += [ '/AI' + meta_include ]		
-	
-	# Handle export definitions file	
-	kw['linkflags'] 	+= [ '/DEF:' + ctx.path.make_node( export_file ).abspath() for export_file in kw['export_definitions']]
-	
+		kw['cxxflags'] += [f'/AI{meta_include}']		
+
+	# Handle export definitions file
+	kw['linkflags'] += [
+	    f'/DEF:{ctx.path.make_node( export_file ).abspath()}'
+	    for export_file in kw['export_definitions']
+	]
+
 	# Generate output file name (without file ending), use target as an default if nothing is specified
 	if kw['output_file_name'] == []:
 		kw['output_file_name'] = target
@@ -691,14 +692,14 @@ def BuildTaskGenerator(ctx, kw):
 	spec = ctx.options.project_spec
 	platform = ctx.env['PLATFORM']
 	configuration = ctx.GetConfiguration(target)
-	
+
 	if ctx.cmd == 'configure':
 		return False 		# Dont build during configure
-		
+
 	if ctx.cmd == 'generate_uber_files':
 		ctx(features='generate_uber_file', uber_file_list=kw['file_list_content'], target=target, pch=os.path.basename( kw.get('pch', '') ))
 		return False 		# Dont do the normal build when generating uber files
-		
+
 	if ctx.env['PLATFORM'] == 'cppcheck':
 		ctx(features='generate_uber_file', to_check_sources = kw['source_files'] + kw['header_files'], target=target)
 		return False		# Dont do the normal build when running cpp check
@@ -706,10 +707,10 @@ def BuildTaskGenerator(ctx, kw):
 	# Always include all projects when generating project for IDEs
 	if ctx.env['PLATFORM'] == 'project_generator':
 		return True
-			
+
 	if target in ctx.spec_modules():
 		return True		# Skip project is it is not part of the current spec
-			
+
 	return False
 			
 @feature('apply_additional_settings')
@@ -725,14 +726,14 @@ def tg_apply_additional_settings(self):
 		input_file = t.inputs[0].abspath()
 
 		file_specific_settings = self.file_specifc_settings.get(input_file, None)
-		
+
 		if not file_specific_settings:
 			continue
-			
+
 		t.env['CFLAGS'] 	+= file_specific_settings.get('cflags', [])
 		t.env['CXXFLAGS'] += file_specific_settings.get('cxxflags', [])
 		t.env['DEFINES'] 	+= file_specific_settings.get('defines', [])
-		
+
 		for inc in file_specific_settings.get('defines', []):
 			if os.path.isabs(inc):
 				t.env['INCPATHS'] += [ inc ]
@@ -861,20 +862,18 @@ def tg_create_static_library(self):
 	# Utility to perform whitelist filtering
 	# Returns the intersection of the two lists
 	def _filter(unfiltered, allowed):
-		result = []
-		for item in unfiltered:
-			if item in allowed:
-				result += [ item ]
-		return result
+		return [item for item in unfiltered if item in allowed]
 
 	# Walks the use_module tree and collects the leaf nodes
 	# This finds the WAF projects that (directly or indirectly) use the project 'node', and adds them to the 'out' list
 	def _recursive_collect_leaves(bld, node, out, depth):
 		node_users = bld.cry_module_users.get(node, [])
 		if depth > 100:
-			fatal('Circular dependency introduced, including at least module' + self.target)
+			fatal(
+			    f'Circular dependency introduced, including at least module{self.target}'
+			)
 		if len(node_users) == 0:
-			if not node in out:
+			if node not in out:
 				out += [ node ]
 		else:
 			for user in node_users:
@@ -943,13 +942,12 @@ def tg_create_static_library(self):
 		
 		def _compute_settings_md5(settings):
 			""" Util function to compute the MD4 of all settings for a tg """
-			keys = list(settings.keys())
-			keys.sort()
+			keys = sorted(settings.keys())
 			tmp = ''
 			for k in keys:
 				values = settings[k]
 				values.sort()
-				tmp += str([k, values])			
+				tmp += str([k, values])
 			return Utils.md5(tmp.encode()).hexdigest().upper()
 		
 		settings_md5 = _compute_settings_md5(entry['settings'])
@@ -1008,44 +1006,45 @@ def CryLauncher(ctx, *k, **kw):
 	"""
 	# Initialize the Task Generator
 	InitializeTaskGenerator(ctx, kw)	
-				
+
 	# Setup TaskGenerator specific settings	
 	set_cryengine_flags(ctx, kw)
 	SetupRunTimeLibraries(ctx,kw)	
-	
+
 	ConfigureTaskGenerator(ctx, kw)
-		
+
 	if not BuildTaskGenerator(ctx, kw):
 		return
-				
+
 	# Copy kw dict and some internal values to prevent overwriting settings in one launcher from another
 	kw_per_launcher = dict(kw)
-	
+
 	# Create multiple projects for each Launcher, based on the number of active projects in the current spec
 	if ctx.env['PLATFORM'] == 'project_generator': 	# For the project generator, just use the first project (doesnt matter which project)
 		active_projects = [ ctx.game_projects()[0] ]
 	else: 																						# Else only use projects for current spec
 		active_projects = ctx.spec_game_projects()
-		
+
 	for project in active_projects:
 		kw_per_launcher['idx'] 				= kw['idx'] + (1000 * (ctx.project_idx(project) + 1));		
-				
+
 		kw_per_launcher['use'] 				= list(kw['use'])
 		kw_per_launcher['lib'] 				= list(kw['lib'])
 		kw_per_launcher['libpath'] 		= list(kw['libpath'])
 		kw_per_launcher['linkflags'] 	= list(kw['linkflags'])
-		
+
 		# Setup values for Launcher Projects
-		kw_per_launcher['features'] 				+= [ 'generate_rc_file' ]	
+		kw_per_launcher['features'] 				+= [ 'generate_rc_file' ]
 		kw_per_launcher['is_launcher'] 			= True
-		kw_per_launcher['resource_path'] 		= ctx.launch_node().make_node(ctx.game_code_folder(project) + '/Resources')
+		kw_per_launcher['resource_path'] = ctx.launch_node().make_node(
+		    f'{ctx.game_code_folder(project)}/Resources')
 		kw_per_launcher['project_name'] 		= project
 		kw_per_launcher['output_file_name'] 	= ctx.get_executable_name( project )
-		
+
 		if _is_monolithic_build(ctx, kw['target']):	
 			kw_per_launcher['defines'] += [ '_LIB', 'CRY_IS_MONOLITHIC_BUILD' ]
 			kw_per_launcher['features'] += [ 'apply_monolithic_build_settings' ]
-					
+
 		ctx.program(*k, **kw_per_launcher)	
 	
 	
@@ -1062,36 +1061,37 @@ def CryDedicatedServer(ctx, *k, **kw):
 	set_cryengine_flags(ctx, kw)
 	SetupRunTimeLibraries(ctx,kw)
 	kw.setdefault('win_linkflags', []).extend(['/SUBSYSTEM:WINDOWS'])
-	
+
 	ConfigureTaskGenerator(ctx, kw)
-		
+
 	if not BuildTaskGenerator(ctx, kw):
 		return
-					
+
 	# Copy kw dict and some internal values to prevent overwriting settings in one launcher from another
 	kw_per_launcher = dict(kw)
-	
+
 	# Create multiple projects for each Launcher, based on the number of active projects in the current spec
 	if ctx.env['PLATFORM'] == 'project_generator': 	# For the project generator, just use the first project (doesnt matter which project)
 		active_projects = [ ctx.game_projects()[0] ]
 	else: 																						# Else only use projects for current spec
 		active_projects = ctx.spec_game_projects()
-		
+
 	for project in active_projects:
-	
+
 		kw_per_launcher['idx'] 				= kw['idx'] + (1000 * (ctx.project_idx(project) + 1));		
-		
+
 		kw_per_launcher['use'] 				= list(kw['use'])
 		kw_per_launcher['lib'] 				= list(kw['lib'])
 		kw_per_launcher['libpath'] 		= list(kw['libpath'])
 		kw_per_launcher['linkflags'] 	= list(kw['linkflags'])
-		
+
 		kw_per_launcher['features'] 						+= [ 'generate_rc_file' ]
 		kw_per_launcher['is_dedicated_server']	 = True
-		kw_per_launcher['resource_path'] 				= ctx.launch_node().make_node(ctx.game_code_folder(project) + '/Resources')
+		kw_per_launcher['resource_path'] = ctx.launch_node().make_node(
+		    f'{ctx.game_code_folder(project)}/Resources')
 		kw_per_launcher['project_name'] 				= project
 		kw_per_launcher['output_file_name'] 			= ctx.get_dedicated_server_executable_name( project )
-		
+
 		if _is_monolithic_build(ctx, kw['target']):
 			kw_per_launcher['defines'] += [ '_LIB', 'CRY_IS_MONOLITHIC_BUILD' ]
 			kw_per_launcher['features'] += [ 'apply_monolithic_build_settings' ]
@@ -1194,27 +1194,29 @@ def CryPlugin(ctx, *k, **kw):
 
 	# Setup TaskGenerator specific settings	
 	ctx.set_editor_flags(kw)
-	
+
 	SetupRunTimeLibraries(ctx,kw)
 	kw['cxxflags'] += ['/EHsc', '/GR', '/wd4251', '/wd4275']
 	kw['defines']   += [ 'SANDBOX_IMPORTS', 'PLUGIN_EXPORTS', 'EDITOR_COMMON_IMPORTS', 'NOT_USE_CRY_MEMORY_MANAGER' ]
-			
+
 	# [HACK]: QT Editor conversion	
 	platform = ctx.env['PLATFORM']
 	spec = ctx.options.project_spec
-	configuration = ctx.GetConfiguration(kw['target'])			
-	if platform and not platform == 'project_generator' and not ctx.cmd == 'generate_uber_files' and 'SandboxLegacy' in ctx.spec_modules(spec, platform, configuration):
+	configuration = ctx.GetConfiguration(kw['target'])
+	if (platform and platform != 'project_generator'
+	    and ctx.cmd != 'generate_uber_files'
+	    and 'SandboxLegacy' in ctx.spec_modules(spec, platform, configuration)):
 		kw['output_sub_folder']  = 'EditorPluginsLegacy' # Override output location
 		kw['use']  +=['SandboxLegacy', 'EditorCommon']
 	else:
 		kw['output_sub_folder']  = 'EditorPlugins'
 		kw['use']  +=['Sandbox', 'EditorCommon']
-		
+
 	ConfigureTaskGenerator(ctx, kw)
-		
+
 	if not BuildTaskGenerator(ctx, kw):
 		return
-		
+
 	ctx.shlib(*k, **kw)
 	
 # [HACK]: QT Editor conversion
@@ -1227,8 +1229,10 @@ def override_libname(self):
 	# [HACK]: QT Editor conversion
 	platform = self.bld.env['PLATFORM']
 	spec = self.bld.options.project_spec
-	configuration = self.bld.GetConfiguration(self.target)	
-	if platform and not platform == 'project_generator' and not self.bld.cmd == 'generate_uber_files' and 'SandboxLegacy' in self.bld.spec_modules(spec, platform, configuration):
+	configuration = self.bld.GetConfiguration(self.target)
+	if (platform and platform != 'project_generator'
+	    and self.bld.cmd != 'generate_uber_files' and
+	    'SandboxLegacy' in self.bld.spec_modules(spec, platform, configuration)):
 		link_task = getattr(self, 'link_task', None)
 		link_task.env['LIB'] = [ 'EditorCommonLegacy' if lib == 'EditorCommon' else lib for lib in link_task.env['LIB']]	
 		
@@ -1241,10 +1245,13 @@ def CryPluginModule(ctx, *k, **kw):
 	# [HACK]: QT Editor conversion	
 	platform = ctx.env['PLATFORM']
 	spec = ctx.options.project_spec
-	configuration = ctx.GetConfiguration(kw['target'])		
-	if platform and not platform == 'project_generator' and not ctx.cmd == 'generate_uber_files' and 'SandboxLegacy' in ctx.spec_modules(spec, platform, configuration) and kw['target'] == 'EditorCommon':
+	configuration = ctx.GetConfiguration(kw['target'])
+	if (platform and platform != 'project_generator'
+	    and ctx.cmd != 'generate_uber_files'
+	    and 'SandboxLegacy' in ctx.spec_modules(spec, platform, configuration)
+	    and kw['target'] == 'EditorCommon'):
 		kw['output_file_name']  = 'EditorCommonLegacy'
-		
+
 	# Initialize the Task Generator
 	InitializeTaskGenerator(ctx, kw)	
 
@@ -1253,12 +1260,12 @@ def CryPluginModule(ctx, *k, **kw):
 	SetupRunTimeLibraries(ctx,kw)
 	kw['cxxflags'] += [ '/EHsc', '/GR', '/wd4251', '/wd4275' ]
 	kw['defines']  += [ 'PLUGIN_EXPORTS', 'EDITOR_COMMON_EXPORTS', 'NOT_USE_CRY_MEMORY_MANAGER' ]
-	
+
 	ConfigureTaskGenerator(ctx, kw)
-		
+
 	if not BuildTaskGenerator(ctx, kw):
 		return
-		
+
 	ctx.shlib(*k, **kw)
 	
 
@@ -1371,15 +1378,12 @@ def GetPlatformSpecificSettings(ctx, kw, entry, _platform, _configuration, force
 	Util function to apply flags based on current platform
 	"""
 	def _to_list( value ):
-		if isinstance(value,list):
-			return value
-		return [ value ]
+		return value if isinstance(value,list) else [ value ]
 	
 	def _flatten(coll):
 		for i in coll:
 			if isinstance(i, Iterable) and not isinstance(i, basestring):
-				for subc in _flatten(i):
-					yield subc
+				yield from _flatten(i)
 			else:
 				yield i
 				
@@ -1428,14 +1432,14 @@ def GetPlatformSpecificSettings(ctx, kw, entry, _platform, _configuration, force
 def get_platform_permutation_map(ctx, platform):
 	platform_permutations 	= ctx.get_platform_list( platform )
 	supported_platforms = ctx.get_supported_platforms()
-	
+
 	# Map all platform_permutations to supported platforms
 	# 'win' -> ['win_x86', 'win_x64']
-	palatform_conversion_map = dict()	
+	palatform_conversion_map = {}
 	for platform_mutation in platform_permutations:
 		matching_platforms = [s for s in supported_platforms if platform_mutation in s]
 		palatform_conversion_map[platform_mutation] = matching_platforms
-		
+
 	return palatform_conversion_map
 	
 ###############################################################################
@@ -1458,9 +1462,7 @@ def ApplyPlatformSpecificModuleExtension(ctx, kw, _platform, _configuration):
 	#   [invalid] e.g. profile_module_extension = ['SomeExtension'] and win_x64_profile = ['SomeExtension'] and/or win_x64_profile = ['SomeExtension','OtherExtension']
 	
 	def _to_list( value ):
-		if isinstance(value,list):
-			return value
-		return [ value ]
+		return value if isinstance(value,list) else [ value ]
 		
 	supported_platforms = ctx.get_supported_platforms()
 	platform_permutations 	= ctx.get_platform_list( _platform )
@@ -1531,26 +1533,27 @@ def CollectPlatformSpecificSettings(ctx, kw, platform, configuration):
 def ApplyConfigOverwrite(ctx, kw):	
 	
 	target = kw['target']
-	if not target in ctx.env['CONFIG_OVERWRITES']:
+	if target not in ctx.env['CONFIG_OVERWRITES']:
 		return
-		
+
 	platform = ctx.env['PLATFORM']
 	overwrite_config = ctx.env['CONFIG_OVERWRITES'][target]
-	
+
 	# Need to set crytek specific shortcuts if loading another environment
-	ctx.all_envs[platform + '_' + overwrite_config]['PLATFORM'] = platform
-	ctx.all_envs[platform + '_' + overwrite_config]['CONFIGURATION'] = overwrite_config
-	
+	ctx.all_envs[f'{platform}_{overwrite_config}']['PLATFORM'] = platform
+	ctx.all_envs[f'{platform}_{overwrite_config}'][
+	    'CONFIGURATION'] = overwrite_config
+
 	# Create a deep copy of the env for overwritten task to prevent modifying other task generator envs
-	kw['env'] = ctx.all_envs[platform + '_' + overwrite_config].derive()
+	kw['env'] = ctx.all_envs[f'{platform}_{overwrite_config}'].derive()
 	kw['env'].detach()
 	
 ###############################################################################
 def ApplySpecSpecificSettings(ctx, kw, platform, configuration, spec):
 	
-	if platform == 'project_generator' or platform == []:
+	if platform in ['project_generator', []]:
 		return {} 	# Return only an empty dict when generating a project
-		
+
 	# To DO:
 	## handle list entries
 	#for entry in 'use_module use export_definitions meta_includes file_list  defines includes cxxflags cflags lib libpath linkflags framework features'.split():		
@@ -1565,10 +1568,10 @@ def ApplySpecSpecificSettings(ctx, kw, platform, configuration, spec):
 
 	for key, value in ctx.spec_defines(spec, platform, configuration).iteritems():
 		kw[key] += value
-		
+
 	for key, value in  ctx.spec_module_extensions(spec, platform, configuration).iteritems():
 		kw[key] += value
-		
+
 	for key, value in  ctx.spec_features(spec, platform, configuration).iteritems():
 		kw[key] += value
 
@@ -1580,14 +1583,14 @@ def _is_monolithic_build(ctx, target):
 	spec = ctx.options.project_spec
 	platform = ctx.env['PLATFORM']
 	configuration = ctx.GetConfiguration(target)		
-	
+
 	if ctx.spec_monolithic_build(spec, platform, configuration):
 		always_dynamically_linked_modules =	ctx.spec_force_shared_monolithic_build_modules(spec, platform, configuration)
 		if target in always_dynamically_linked_modules:
 			Logs.info("[Info]: '%s' force linked as shared library as configured for this spec." % target)
 			return False
 		return True
-		
+
 	return False
 
 @feature('apply_monolithic_build_settings')
@@ -1598,14 +1601,14 @@ def apply_monolithic_build_settings(self):
 	self.lib  += self.bld.monolitic_build_settings['lib']
 	self.libpath    += self.bld.monolitic_build_settings['libpath']
 	self.linkflags  += self.bld.monolitic_build_settings['linkflags']
-	
+
 	# Add game specific files
-	prefix = self.project_name + '_'
-	self.use  += self.bld.monolitic_build_settings[prefix + 'use']
-	self.lib  += self.bld.monolitic_build_settings[prefix + 'lib']
-	self.libpath    += self.bld.monolitic_build_settings[prefix + 'libpath']
-	self.linkflags  += self.bld.monolitic_build_settings[prefix + 'linkflags']
-	
+	prefix = f'{self.project_name}_'
+	self.use += self.bld.monolitic_build_settings[f'{prefix}use']
+	self.lib += self.bld.monolitic_build_settings[f'{prefix}lib']
+	self.libpath += self.bld.monolitic_build_settings[f'{prefix}libpath']
+	self.linkflags += self.bld.monolitic_build_settings[f'{prefix}linkflags']
+
 	self.use  = _preserved_order_remove_duplicates(self.use)
 	self.lib  = _preserved_order_remove_duplicates(self.lib)
 	self.libpath   = _preserved_order_remove_duplicates(self.libpath)
@@ -1688,70 +1691,69 @@ def _p4_move_file(old_path, new_path):
 @conf
 def apply_waf_file_mapping_to_folder(ctx, module_path_node):
 
-	use_p4 = True if _get_p4_workspace("dummy") else False
+	use_p4 = bool(_get_p4_workspace("dummy"))
 	Logs.info("Starting conversion process...")
-		
+
 	abs_root_path = module_path_node.abspath()
 	root_len = len(abs_root_path)
-	
+
 	os_path_join = os.path.join
 	os_path_basename = os.path.basename
-	
+
 	move_function = _p4_move_file if use_p4 else  os.rename
-	
+
 	waf_file_nodes = []
 	for root, dirs, files in os.walk(abs_root_path, True):
 		for file in files:
 			if file.endswith('.waf_files'):
 				waf_file_nodes += [module_path_node.make_node(file)]
 		break # do not recurse .. 
-				
-				
+
+
 	# Per waf file so we can re-write the file
 	for waf_file in waf_file_nodes:
 		file_map = _scan_waf_files(ctx, [waf_file]).values()[0]
-		
+
 		# Move files physically
 		for vs_filter, file_list in file_map.iteritems():
 			final_path = os_path_join(abs_root_path,vs_filter)
-			
+
 			if vs_filter.lower() == "root":
 				continue
-			
+
 			if not os.path.exists(final_path):
 				os.makedirs(final_path)
-				
+
 			for file in file_list:
 				filename = os_path_basename(file)
-				relative_output_location = os_path_join(vs_filter,filename)			
-				if not file == relative_output_location:
+				relative_output_location = os_path_join(vs_filter,filename)
+				if file != relative_output_location:
 					source = os_path_join(abs_root_path, file)
 					target = os_path_join(abs_root_path, relative_output_location)
 					move_function(source, target)
 					Logs.info( 'Moved: "%s" -> "%s"' % (file, relative_output_location))
-			
+
 		# Change waf_file in place
 		waf_file_path = waf_file.abspath()
 		source_file = waf_file_path
-		destination_file = waf_file_path+"._bak"
-	    
+		destination_file = f"{waf_file_path}._bak"
+
 		try:
 			os.chmod( destination_file, stat.S_IWRITE )	
 			os.remove(destination_file)
 		except:
 			pass
-		
-		
-		destination = open(destination_file, 'w')
-		source = open(source_file, 'r')
-		
-		destination_has_changed = False
-		for line in source.readlines(): # try readlines
-			final_line = line
-			line = line.strip()
-			
-			if line and line[0] == '"':
-				if not ':' in line:
+
+
+		with open(destination_file, 'w') as destination:
+			source = open(source_file, 'r')
+
+			destination_has_changed = False
+			for line in source.readlines(): # try readlines
+				final_line = line
+				line = line.strip()
+
+				if line and line[0] == '"' and ':' not in line:
 					filename = line[1: line.find('"', 1)]
 					for vs_filter, file_list in file_map.iteritems():
 						if vs_filter.lower() == "root":
@@ -1762,14 +1764,13 @@ def apply_waf_file_mapping_to_folder(ctx, module_path_node):
 								destination_has_changed = True
 								#Logs.info( 'Found match: "%s" and "%s"' % (file, filename))
 								break
-							
-			destination.write(final_line)
-		destination.close()
+
+				destination.write(final_line)
 		source.close()
-		
+
 		if destination_has_changed:
 			_p4_edit_file(waf_file_path)
-			
+
 			try:
 				os.chmod( source_file, stat.S_IWRITE )	
 				os.remove(source_file)

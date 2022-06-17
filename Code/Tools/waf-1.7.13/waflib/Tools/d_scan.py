@@ -23,7 +23,7 @@ def filter_comments(filename):
 	begin = 0
 	while i < max:
 		c = txt[i]
-		if c == '"' or c == "'":  # skip a string or character literal
+		if c in ['"', "'"]:  # skip a string or character literal
 			buf.append(txt[begin:i])
 			delim = c
 			i += 1
@@ -115,9 +115,8 @@ class d_parser(object):
 				self.nodes.append(found)
 				self.waiting.append(found)
 				break
-		if not found:
-			if not filename in self.names:
-				self.names.append(filename)
+		if not found and filename not in self.names:
+			self.names.append(filename)
 
 	def get_strings(self, code):
 		"""
@@ -130,33 +129,20 @@ class d_parser(object):
 		self.module = ''
 		lst = []
 
-		# get the module name (if present)
-
-		mod_name = self.re_module.search(code)
-		if mod_name:
+		if mod_name := self.re_module.search(code):
 			self.module = re.sub('\s+', '', mod_name.group(1)) # strip all whitespaces
 
-		# go through the code, have a look at all import occurrences
-
-		# first, lets look at anything beginning with "import" and ending with ";"
-		import_iterator = self.re_import.finditer(code)
-		if import_iterator:
+		if import_iterator := self.re_import.finditer(code):
 			for import_match in import_iterator:
 				import_match_str = re.sub('\s+', '', import_match.group(1)) # strip all whitespaces
 
-				# does this end with an import bindings declaration?
-				# (import bindings always terminate the list of imports)
-				bindings_match = self.re_import_bindings.match(import_match_str)
-				if bindings_match:
+				if bindings_match := self.re_import_bindings.match(import_match_str):
 					import_match_str = bindings_match.group(1)
-					# if so, extract the part before the ":" (since the module declaration(s) is/are located there)
-
 				# split the matching string into a bunch of strings, separated by a comma
 				matches = import_match_str.split(',')
 
 				for match in matches:
-					alias_match = self.re_import_alias.match(match)
-					if alias_match:
+					if alias_match := self.re_import_alias.match(match):
 						# is this an alias declaration? (alias = module name) if so, extract the module name
 						match = alias_match.group(1)
 

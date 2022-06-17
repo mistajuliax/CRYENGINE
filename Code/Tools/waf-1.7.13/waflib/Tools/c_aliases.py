@@ -56,7 +56,6 @@ def sniff_features(**kw):
 	if 'java' in exts:
 		feats.append('java')
 
-	if 'java' in exts:
 		return 'java'
 
 	if type in ['program', 'shlib', 'stlib']:

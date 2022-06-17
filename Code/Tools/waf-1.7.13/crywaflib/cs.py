@@ -21,13 +21,14 @@ Note that the configuration may compile C# snippets::
 			bintype='exe', csflags=['-pkg:gtk-sharp-2.0'], msg='Checking for Gtksharp support')
 """
 
+
 from waflib import Utils, Task, Options, Logs, Errors
 from waflib.TaskGen import before_method, after_method, feature
 from waflib.Tools import ccroot
 from waflib.Configure import conf
 import os, tempfile
 
-ccroot.USELIB_VARS['cs'] = set(['CSFLAGS', 'ASSEMBLIES', 'RESOURCES'])
+ccroot.USELIB_VARS['cs'] = {'CSFLAGS', 'ASSEMBLIES', 'RESOURCES'}
 ccroot.lib_patterns['csshlib'] = ['%s']
 
 @feature('cs')
@@ -47,12 +48,13 @@ def apply_cs(self):
 
 	bintype = getattr(self, 'bintype', self.gen.endswith('.dll') and 'library' or 'exe')
 	self.cs_task = tsk = self.create_task('mcs', cs_nodes, self.path.find_or_declare(self.gen))
-	tsk.env.CSTYPE = '/target:%s' % bintype
-	tsk.env.OUT = '/out:%s' % tsk.outputs[0].abspath()
-	self.env.append_value('CSFLAGS', '/platform:%s' % getattr(self, 'platform', 'anycpu'))
+	tsk.env.CSTYPE = f'/target:{bintype}'
+	tsk.env.OUT = f'/out:{tsk.outputs[0].abspath()}'
+	self.env.append_value('CSFLAGS',
+	                      f"/platform:{getattr(self, 'platform', 'anycpu')}")
 
-	inst_to = getattr(self, 'install_path', bintype=='exe' and '${BINDIR}' or '${LIBDIR}')
-	if inst_to:
+	if inst_to := getattr(self, 'install_path', bintype == 'exe' and '${BINDIR}'
+	                      or '${LIBDIR}'):
 		# note: we are making a copy, so the files added to cs_task.outputs won't be installed automatically
 		mod = getattr(self, 'chmod', bintype=='exe' and Utils.O755 or Utils.O644)
 		self.install_task = self.bld.install_files(inst_to, self.cs_task.outputs[:], env=self.env, chmod=mod)
@@ -73,7 +75,7 @@ def use_cs(self):
 		try:
 			y = get(x)
 		except Errors.WafError:
-			self.env.append_value('CSFLAGS', '/reference:%s' % x)
+			self.env.append_value('CSFLAGS', f'/reference:{x}')
 			continue
 		y.post()
 
@@ -82,7 +84,7 @@ def use_cs(self):
 			self.bld.fatal('cs task has no link task for use %r' % self)
 		self.cs_task.dep_nodes.extend(tsk.outputs) # dependency
 		self.cs_task.set_run_after(tsk) # order (redundant, the order is infered from the nodes inputs/outputs)
-		self.env.append_value('CSFLAGS', '/reference:%s' % tsk.outputs[0].abspath())
+		self.env.append_value('CSFLAGS', f'/reference:{tsk.outputs[0].abspath()}')
 
 @feature('cs')
 @after_method('apply_cs', 'use_cs')
@@ -100,7 +102,7 @@ def debug_cs(self):
 
 	node = self.cs_task.outputs[0]
 	if self.env.CS_NAME == 'mono':
-		out = node.parent.find_or_declare(node.name + '.mdb')
+		out = node.parent.find_or_declare(f'{node.name}.mdb')
 	else:
 		out = node.change_ext('.pdb')
 	self.cs_task.outputs.append(out)
@@ -109,10 +111,10 @@ def debug_cs(self):
 	except AttributeError:
 		pass
 
-	if csdebug == 'pdbonly':
-		val = ['/debug+', '/debug:pdbonly']
-	elif csdebug == 'full':
+	if csdebug == 'full':
 		val = ['/debug+', '/debug:full']
+	elif csdebug == 'pdbonly':
+		val = ['/debug+', '/debug:pdbonly']
 	else:
 		val = ['/debug-']
 	self.env.append_value('CSFLAGS', val)
@@ -127,7 +129,7 @@ class mcs(Task.Task):
 
 	def exec_command(self, cmd, **kw):
 		bld = self.generator.bld
-		
+
 		try:
 			if not kw.get('cwd', None):
 				kw['cwd'] = bld.cwd
@@ -142,7 +144,7 @@ class mcs(Task.Task):
 				(fd, tmp) = tempfile.mkstemp()
 				os.write(fd, '\r\n'.join(i.replace('\\', '\\\\') for i in cmd[1:]).encode())
 				os.close(fd)
-				cmd = [program, '@' + tmp]
+				cmd = [program, f'@{tmp}']
 			# no return here, that's on purpose
 			ret = self.generator.bld.exec_command(cmd, **kw)
 		finally:
@@ -171,15 +173,14 @@ def configure(conf):
 	"""
 	Find a C# compiler, set the variable MCS for the compiler and CS_NAME (mono or csc)
 	"""
-	csc = getattr(Options.options, 'cscbinary', None)
-	if csc:
+	if csc := getattr(Options.options, 'cscbinary', None):
 		conf.env.MCS = csc
 	conf.find_program(['csc', 'mcs', 'gmcs'], var='MCS', silent_output=True)
 	conf.env.ASS_ST = '/r:%s'
 	conf.env.RES_ST = '/resource:%s'
 
 	conf.env.CS_NAME = 'csc'
-	if str(conf.env.MCS).lower().find('mcs') > -1:
+	if 'mcs' in str(conf.env.MCS).lower():
 		conf.env.CS_NAME = 'mono'
 
 def options(opt):

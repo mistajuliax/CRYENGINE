@@ -17,13 +17,13 @@ def _is_option_true(options, option_name):
 	""" Internal util function to better intrepret all flavors of true/false without a build context """
 	if not hasattr(options, option_name):
 		raise Errors.WafError('[ERROR] Unknown option: "%s"' % option_name)
-	
+
 	value = getattr(options, option_name)
-	if value.lower() == 'true' or value.lower() == 't' or value.lower() == 'yes' or value.lower() == 'y' or value.lower() == '1':
+	if value.lower() in ['true', 't', 'yes', 'y', '1']:
 		return True
-	if value.lower() == 'false' or value.lower() == 'f' or value.lower() == 'no' or value.lower() == 'n' or value.lower() == '0':
+	if value.lower() in ['false', 'f', 'no', 'n', '0']:
 		return False
-		
+
 	raise Errors.WafError('[ERROR] Can not interpret "%s" as a boolean value!.\nThe supported values are:\nTrue:    true, t, yes, y, 1\nFalse:   false, f, no, n, 0' % value )
 
 	
@@ -41,20 +41,20 @@ def waf_entry_point(current_directory, version, wafdir):
 	def _wait_for_user_input():
 		""" Helper function to wait for a key press when needed (like on windows to prevent closing the windows """
 		try:
-			if not Utils.unversioned_sys_platform()	== 'win32':
+			if Utils.unversioned_sys_platform() != 'win32':
 				return # No need on non windows platforms
-				
+
 			if not _is_option_true(Options.options, 'ask_for_user_input'):
 				return # Obey what the user wants
-				
+
 			if Options.options.execsolution:
 				return # Dont ask for input in visual studio
-			
+
 			if _is_option_true(Options.options, 'internal_dont_check_recursive_execution'):
 				return # Dont ask from within Incredibuild
-			
-			import msvcrt		
-			Logs.error('Please Press Any Key to Continue')						
+
+			import msvcrt
+			Logs.error('Please Press Any Key to Continue')
 			msvcrt.getch()
 		except:
 			pass # Crashed to early to do something meaningful
@@ -66,28 +66,26 @@ def waf_entry_point(current_directory, version, wafdir):
 			stackstace = traceback.format_tb(exc_traceback)
 			sys.stdout.write('Traceback (most recent call last):\n')
 			python_to_vs = re.compile(r'(.*?)"(.+?)", line ([0-9]+?),(.*)', re.M)
-			
+
 			# Align output vertically
 			nAlignedPos = 0
 			for line in stackstace[:-1]:
-				m = re.match(python_to_vs, line)
-				if m:
-					nNeededLenght = len('%s(%s):' % (m.group(2), m.group(3)))
+				if m := re.match(python_to_vs, line):
+					nNeededLenght = len(f'{m[2]}({m[3]}):')
 					if nNeededLenght > nAlignedPos:
 						nAlignedPos = nNeededLenght
-						
+
 			# output
 			for line in stackstace[:-1]:
-				m = re.match(python_to_vs, line)
-				if m:
-					nNeededSpaces = 1 + (nAlignedPos - len('%s(%s):' % (m.group(2), m.group(3))))
-					sys.stdout.write('%s(%s):%s%s\n' % (m.group(2), m.group(3), ' ' * nNeededSpaces, m.group(4)))
+				if m := re.match(python_to_vs, line):
+					nNeededSpaces = 1 + (nAlignedPos - len(f'{m[2]}({m[3]}):'))
+					sys.stdout.write('%s(%s):%s%s\n' % (m[2], m[3], ' ' * nNeededSpaces, m[4]))
 				else:
 					sys.stdout.write(line)
-						
-			m = re.match(python_to_vs, stackstace[-1])
-			if m:
-				sys.stdout.write('%s(%s): error : %s %s\n' % (m.group(2), m.group(3), m.group(4), str(exc_value)))
+
+			if m := re.match(python_to_vs, stackstace[-1]):
+				sys.stdout.write(
+				    '%s(%s): error : %s %s\n' % (m[2], m[3], m[4], str(exc_value)))
 			else:
 				sys.stdout.write(line)
 		else:
@@ -259,7 +257,7 @@ def set_main_module(file_path):
 
 	def set_def(obj):
 		name = obj.__name__
-		if not name in Context.g_module.__dict__:
+		if name not in Context.g_module.__dict__:
 			setattr(Context.g_module, name, obj)
 	for k in [update, dist, distclean, distcheck, update]:
 		set_def(k)
@@ -295,12 +293,13 @@ def parse_options():
 
 	if Logs.verbose > 2:
 		Logs.zones = ['*']
-		
+
 	# Force console mode for SSH connections
-	if getattr(Options.options, 'console_mode', None):
-		if os.environ.get('SSH_CLIENT') != None or os.environ.get('SSH_TTY') != None:
-			Logs.info("[INFO] - SSH Connection detected. Forcing 'console_mode'")
-			Options.options.console_mode = str(True)
+	if getattr(Options.options, 'console_mode',
+	           None) and (os.environ.get('SSH_CLIENT') != None
+	                      or os.environ.get('SSH_TTY') != None):
+		Logs.info("[INFO] - SSH Connection detected. Forcing 'console_mode'")
+		Options.options.console_mode = str(True)
 
 def run_command(cmd_name):
 	"""
@@ -317,11 +316,10 @@ def run_command(cmd_name):
 		ctx.execute()
 	except AttributeError as e:
 		t, v, tb = sys.exc_info()
-		if str(v) == "'Context' object has no attribute 'add_group'":
-			Logs.warn('[WARN] Received invalid command "%s" - please check your command line' % cmd_name)
-			ctx.skip_finish_message = True
-		else:
+		if str(v) != "'Context' object has no attribute 'add_group'":
 			raise
+		Logs.warn('[WARN] Received invalid command "%s" - please check your command line' % cmd_name)
+		ctx.skip_finish_message = True
 	return ctx
 
 def run_commands():
@@ -334,24 +332,22 @@ def run_commands():
 	run_command('init')
 	while Options.commands:
 		cmd_name = Options.commands.pop(0)
-		ctx = run_command(cmd_name)		
-		if not _is_option_true(Options.options, 'internal_dont_check_recursive_execution'): # Dont output finished message when running in IB (as the non IB will output it anyway afterwards)
-			if getattr(ctx, 'skip_finish_message', False) == False:
-				if ctx.options.project_spec and ('build' in cmd_name or 'clean' in cmd_name):				
-					Logs.info('[WAF] %r (%r) finished successfully (%s)' % (cmd_name, ctx.options.project_spec, str(ctx.log_timer)))
-				else:
-					Logs.info('[WAF] %r finished successfully (%s)' % (cmd_name, str(ctx.log_timer)))
+		ctx = run_command(cmd_name)
+		if not _is_option_true(
+		    Options.options,
+		    'internal_dont_check_recursive_execution') and not getattr(
+		        ctx, 'skip_finish_message', False):
+			if ctx.options.project_spec and ('build' in cmd_name or 'clean' in cmd_name):				
+				Logs.info('[WAF] %r (%r) finished successfully (%s)' % (cmd_name, ctx.options.project_spec, str(ctx.log_timer)))
+			else:
+				Logs.info('[WAF] %r finished successfully (%s)' % (cmd_name, str(ctx.log_timer)))
 		ctx.skip_finish_message = False
 	run_command('shutdown')
 
 ###########################################################################################
 
 def _can_distclean(name):
-	# WARNING: this method may disappear anytime
-	for k in '.o .moc .exe'.split():
-		if name.endswith(k):
-			return True
-	return False
+	return any(name.endswith(k) for k in '.o .moc .exe'.split())
 
 def distclean_dir(dirname):
 	"""
@@ -461,7 +457,7 @@ class Dist(Context.Context):
 			zip = zipfile.ZipFile(arch_name, 'w', compression=zipfile.ZIP_DEFLATED)
 
 			for x in files:
-				archive_name = self.get_base_name() + '/' + x.path_from(self.base_path)
+				archive_name = f'{self.get_base_name()}/{x.path_from(self.base_path)}'
 				zip.write(x.abspath(), archive_name, zipfile.ZIP_DEFLATED)
 			zip.close()
 		else:
@@ -476,7 +472,7 @@ class Dist(Context.Context):
 		except Exception:
 			digest = ''
 
-		Logs.info('New archive created: %s%s' % (self.arch_name, digest))
+		Logs.info(f'New archive created: {self.arch_name}{digest}')
 
 	def get_tar_path(self, node):
 		"""
@@ -490,7 +486,8 @@ class Dist(Context.Context):
 		Add a file to the tar archive. Transform symlinks into files if the files lie out of the project tree.
 		"""
 		p = self.get_tar_path(x)
-		tinfo = tar.gettarinfo(name=p, arcname=self.get_tar_prefix() + '/' + x.path_from(self.base_path))
+		tinfo = tar.gettarinfo(
+		    name=p, arcname=f'{self.get_tar_prefix()}/{x.path_from(self.base_path)}')
 		tinfo.uid   = 0
 		tinfo.gid   = 0
 		tinfo.uname = 'root'
@@ -522,7 +519,8 @@ class Dist(Context.Context):
 		try:
 			self.arch_name
 		except AttributeError:
-			self.arch_name = self.get_base_name() + '.' + self.ext_algo.get(self.algo, self.algo)
+			self.arch_name = (
+			    f'{self.get_base_name()}.{self.ext_algo.get(self.algo, self.algo)}')
 		return self.arch_name
 
 	def get_base_name(self):
@@ -540,7 +538,7 @@ class Dist(Context.Context):
 		except AttributeError:
 			appname = getattr(Context.g_module, Context.APPNAME, 'noname')
 			version = getattr(Context.g_module, Context.VERSION, '1.0')
-			self.base_name = appname + '-' + version
+			self.base_name = f'{appname}-{version}'
 		return self.base_name
 
 	def get_excl(self):
@@ -556,10 +554,9 @@ class Dist(Context.Context):
 		try:
 			return self.excl
 		except AttributeError:
-			self.excl = Node.exclude_regs + ' **/waf-1.7.* **/.waf-1.7* **/waf3-1.7.* **/.waf3-1.7* **/*~ **/*.rej **/*.orig **/*.pyc **/*.pyo **/*.bak **/*.swp **/.lock-w*'
-			nd = self.root.find_node(Context.out_dir)
-			if nd:
-				self.excl += ' ' + nd.path_from(self.base_path)
+			self.excl = f'{Node.exclude_regs} **/waf-1.7.* **/.waf-1.7* **/waf3-1.7.* **/.waf3-1.7* **/*~ **/*.rej **/*.orig **/*.pyc **/*.pyo **/*.bak **/*.swp **/.lock-w*'
+			if nd := self.root.find_node(Context.out_dir):
+				self.excl += f' {nd.path_from(self.base_path)}'
 			return self.excl
 
 	def get_files(self):
@@ -629,12 +626,21 @@ class DistCheck(Dist):
 			cfg = [x for x in sys.argv if x.startswith('-')]
 
 		instdir = tempfile.mkdtemp('.inst', self.get_base_name())
-		ret = Utils.subprocess.Popen([sys.executable, sys.argv[0], 'configure', 'install', 'uninstall', '--destdir=' + instdir] + cfg, cwd=self.get_base_name()).wait()
-		if ret:
+		if ret := Utils.subprocess.Popen(
+		    [
+		        sys.executable,
+		        sys.argv[0],
+		        'configure',
+		        'install',
+		        'uninstall',
+		        f'--destdir={instdir}',
+		    ] + cfg,
+		    cwd=self.get_base_name(),
+		).wait():
 			raise Errors.WafError('distcheck failed with code %i' % ret)
 
 		if os.path.exists(instdir):
-			raise Errors.WafError('distcheck succeeded, but files were left in %s' % instdir)
+			raise Errors.WafError(f'distcheck succeeded, but files were left in {instdir}')
 
 		shutil.rmtree(self.get_base_name())
 
@@ -647,13 +653,16 @@ def update(ctx):
 	'''updates the plugins from the *waflib/extras* directory'''
 	lst = Options.options.files.split(',')
 	if not lst:
-		lst = [x for x in Utils.listdir(Context.waf_dir + '/waflib/extras') if x.endswith('.py')]
+		lst = [
+		    x for x in Utils.listdir(f'{Context.waf_dir}/waflib/extras')
+		    if x.endswith('.py')
+		]
 	for x in lst:
 		tool = x.replace('.py', '')
 		try:
 			Configure.download_tool(tool, force=True, ctx=ctx)
 		except Errors.WafError:
-			Logs.error('Could not find the tool %s in the remote repository' % x)
+			Logs.error(f'Could not find the tool {x} in the remote repository')
 
 def autoconfigure(execute_method):
 	"""
@@ -665,7 +674,7 @@ def autoconfigure(execute_method):
 
 		env = ConfigSet.ConfigSet()
 		do_config = False
-		if self.root.find_node(self.cache_dir) == None:
+		if self.root.find_node(self.cache_dir) is None:
 			do_config = True
 		else:
 			try:

@@ -30,8 +30,7 @@ def ifort_modifier_darwin(conf):
 @conf
 def ifort_modifier_platform(conf):
 	dest_os = conf.env['DEST_OS'] or Utils.unversioned_sys_platform()
-	ifort_modifier_func = getattr(conf, 'ifort_modifier_' + dest_os, None)
-	if ifort_modifier_func:
+	if ifort_modifier_func := getattr(conf, f'ifort_modifier_{dest_os}', None):
 		ifort_modifier_func()
 
 @conf
@@ -41,10 +40,7 @@ def get_ifort_version(conf, fc):
 	version_re = re.compile(r"ifort\s*\(IFORT\)\s*(?P<major>\d*)\.(?P<minor>\d*)", re.I).search
 	cmd = fc + ['--version']
 	out, err = fc_config.getoutput(conf, cmd, stdin=False)
-	if out:
-		match = version_re(out)
-	else:
-		match = version_re(err)
+	match = version_re(out) if out else version_re(err)
 	if not match:
 		conf.fatal('cannot determine ifort version.')
 	k = match.groupdict()

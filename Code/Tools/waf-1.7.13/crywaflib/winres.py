@@ -18,19 +18,19 @@ def rc_file(self, node):
 	Bind the .rc extension to a winrc task
 	"""
 	platform = self.bld.env['PLATFORM']
-	if platform != 'win_x86' and platform != 'win_x64':	
+	if platform not in ['win_x86', 'win_x64']:	
 		return	
-	
-	obj_ext = '.' + str(self.idx) + '.rc.o'
+
+	obj_ext = f'.{str(self.idx)}.rc.o'
 	if self.env['WINRC_TGT_F'] == '/fo':
-		obj_ext = '.' + str(self.idx) +'.res'
-	
+		obj_ext = f'.{str(self.idx)}.res'
+
 	rctask = self.create_task('winrc', node, node.change_ext(obj_ext))
-		
+
 	#print rctask.env['INCLUDES']
-	rctask.env = rctask.env.derive()	
+	rctask.env = rctask.env.derive()
 	rctask.env.detach()
-		
+
 	if hasattr(self, 'winres_includes'):		
 		if isinstance(self.winres_includes, list):
 			rctask.env['INCLUDES'] += self.winres_includes
@@ -98,10 +98,10 @@ class rc_parser(c_preproc.c_parser):
 			pc[filepath] = lines
 			self.lines.extend(lines)
 		except IOError:
-			raise c_preproc.PreprocError("could not read the file %s" % filepath)
+			raise c_preproc.PreprocError(f"could not read the file {filepath}")
 		except Exception:
 			if Logs.verbose > 0:
-				Logs.error("parsing %s failed" % filepath)
+				Logs.error(f"parsing {filepath} failed")
 				traceback.print_exc()
 
 class winrc(Task.Task):

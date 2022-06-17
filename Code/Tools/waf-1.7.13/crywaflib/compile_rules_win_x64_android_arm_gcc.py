@@ -195,7 +195,7 @@ def check_win_x64_android_arm_gcc_installed(conf):
 	Check compiler is actually installed on executing machine
 	"""
 	v = conf.env
-	
+
 	# Setup Tools for GCC Cross Compile Toolchain
 	if not conf.is_option_true('auto_detect_compiler'):	
 		android_sdk_home		= conf.CreateRootRelativePath('Code/SDKs/android-sdk')
@@ -207,31 +207,33 @@ def check_win_x64_android_arm_gcc_installed(conf):
 		android_ndk_home 		= os.getenv('NDK_ROOT', "")
 		android_java_home 	= os.getenv('JAVA_HOME', "")
 		android_ant_home 		= os.getenv('ANT_HOME', "")
-		
+
 	# Validate paths
 	for path in [android_sdk_home, android_ndk_home, android_java_home, android_ant_home]:
 		if not os.path.exists(path):
-			conf.cry_warning("Requiered Android SDK path does not exist: %s." % path)
+			conf.cry_warning(f"Requiered Android SDK path does not exist: {path}.")
 			return False
 
-	# Configure platform and compiler mutations		
-	platform_target = '/platforms/android-' + str(android_target_version)
+	# Configure platform and compiler mutations
+	platform_target = f'/platforms/android-{str(android_target_version)}'
 	compiler_target = '/arch-arm'
 	compiler_version = str(android_compiler_version)
-	toolchain = 'arm-linux-androideabi-' + compiler_version
-	
+	toolchain = f'arm-linux-androideabi-{compiler_version}'
+
 	android_sdk_platform_target 	= android_sdk_home + platform_target
 	android_ndk_platform_compiler_target 	= android_ndk_home + platform_target + compiler_target
-	android_ndk_toolchain_target 	= android_ndk_home + '/toolchains/' + toolchain + '/prebuilt/windows-x86_64'
+	android_ndk_toolchain_target = (
+	    f'{android_ndk_home}/toolchains/{toolchain}/prebuilt/windows-x86_64')
 	if not os.path.exists(android_ndk_toolchain_target): # Fallback if the 64 bit compiler is not found
-		android_ndk_toolchain_target 	= android_ndk_home + '/toolchains/' + toolchain + '/prebuilt/windows'
-		
+		android_ndk_toolchain_target = (
+		    f'{android_ndk_home}/toolchains/{toolchain}/prebuilt/windows')
+
 	# Validate paths
 	for path in [android_sdk_platform_target, android_ndk_platform_compiler_target, android_ndk_toolchain_target]:
 		if not os.path.exists(path):
-			conf.cry_warning("Requiered Android SDK path does not exist: %s." % path)
+			conf.cry_warning(f"Requiered Android SDK path does not exist: {path}.")
 			return False
-		
+
 	return  True
 	
 @conf
@@ -241,14 +243,14 @@ def load_win_x64_android_arm_gcc_common_settings(conf):
 	"""
 	
 	v = conf.env
-	
+
 	# Setup Tools for GCC Cross Compile Toolchain
 	if not conf.is_option_true('auto_detect_compiler'):	
 		android_sdk_home		= conf.CreateRootRelativePath('Code/SDKs/android-sdk')
 		android_ndk_home		= conf.CreateRootRelativePath('Code/SDKs/android-ndk')
 		android_java_home		= conf.CreateRootRelativePath('Code/SDKs/jdk')
 		android_ant_home 		= conf.CreateRootRelativePath('Code/SDKs/apache-ant')
-		
+
 		# Validate paths
 		for path in [android_sdk_home, android_ndk_home, android_java_home, android_ant_home]:
 			if not os.path.exists(path):
@@ -269,69 +271,76 @@ def load_win_x64_android_arm_gcc_common_settings(conf):
 		if not os.path.exists(android_ant_home):
 			conf.cry_error("Unable to locate APACHE ANT. Environment variable 'ANT_HOME' not set? Do you have Tegra Android Development Pack (TADP) installed?")
 
-	# Configure platform and compiler mutations		
-	platform_target = '/platforms/android-' + str(android_target_version)
+	# Configure platform and compiler mutations
+	platform_target = f'/platforms/android-{str(android_target_version)}'
 	compiler_target = '/arch-arm'
 	compiler_version = str(android_compiler_version)
-	toolchain = 'arm-linux-androideabi-' + compiler_version
-	
+	toolchain = f'arm-linux-androideabi-{compiler_version}'
+
 	android_sdk_platform_target 	= android_sdk_home + platform_target
 	android_ndk_platform_compiler_target 	= android_ndk_home + platform_target + compiler_target
-	android_ndk_toolchain_target 	= android_ndk_home + '/toolchains/' + toolchain + '/prebuilt/windows-x86_64'
+	android_ndk_toolchain_target = (
+	    f'{android_ndk_home}/toolchains/{toolchain}/prebuilt/windows-x86_64')
 	if not os.path.exists(android_ndk_toolchain_target): # Fallback if the 64 bit compiler is not found
-		android_ndk_toolchain_target 	= android_ndk_home + '/toolchains/' + toolchain + '/prebuilt/windows'
+		android_ndk_toolchain_target = (
+		    f'{android_ndk_home}/toolchains/{toolchain}/prebuilt/windows')
 
-	android_stl_home = android_ndk_home + '/sources/cxx-stl/gnu-libstdc++/' + compiler_version
-	
-	v['AR'] = android_ndk_toolchain_target + '/bin/arm-linux-androideabi-ar'
-	v['CC'] = android_ndk_toolchain_target + '/bin/arm-linux-androideabi-gcc.exe'
-	v['CXX'] = android_ndk_toolchain_target + '/bin/arm-linux-androideabi-g++.exe'
-	v['LINK'] = v['LINK_CC'] = v['LINK_CXX'] = android_ndk_toolchain_target + '/bin/arm-linux-androideabi-g++.exe'
-	v['STRIP'] = android_ndk_toolchain_target + '/bin/arm-linux-androideabi-strip.exe'
-	
-	v['JAR'] = android_java_home + '/bin/jar.exe'
-	v['JAVAC'] = android_java_home +'/bin/javac.exe'
-	v['ANDROID_CLASSPATH'] = android_sdk_platform_target + '/android.jar'
+	android_stl_home = (
+	    f'{android_ndk_home}/sources/cxx-stl/gnu-libstdc++/{compiler_version}')
+
+	v['AR'] = f'{android_ndk_toolchain_target}/bin/arm-linux-androideabi-ar'
+	v['CC'] = f'{android_ndk_toolchain_target}/bin/arm-linux-androideabi-gcc.exe'
+	v['CXX'] = f'{android_ndk_toolchain_target}/bin/arm-linux-androideabi-g++.exe'
+	v['LINK'] = v['LINK_CC'] = v[
+	    'LINK_CXX'] = f'{android_ndk_toolchain_target}/bin/arm-linux-androideabi-g++.exe'
+	v['STRIP'] = f'{android_ndk_toolchain_target}/bin/arm-linux-androideabi-strip.exe'
+
+	v['JAR'] = f'{android_java_home}/bin/jar.exe'
+	v['JAVAC'] = f'{android_java_home}/bin/javac.exe'
+	v['ANDROID_CLASSPATH'] = f'{android_sdk_platform_target}/android.jar'
 	v['ANDROID_TARGET_VERSION'] = android_target_version
-	
-	v['ANT'] = android_ant_home + '/bin/ant.bat'
-	
-	v['ANDROID_NDK_HOME'] = android_ndk_home 
-	v['ANDROID_SDL_HOME'] = android_stl_home 
-	v['ANDROID_SDK_HOME'] = android_sdk_home 
+
+	v['ANT'] = f'{android_ant_home}/bin/ant.bat'
+
+	v['ANDROID_NDK_HOME'] = android_ndk_home
+	v['ANDROID_SDL_HOME'] = android_stl_home
+	v['ANDROID_SDK_HOME'] = android_sdk_home
 	v['ANDROID_JAVA_HOME'] = android_java_home
-	
+
 	v['cprogram_PATTERN'] 	= '%s'
 	v['cxxprogram_PATTERN'] = '%s'
 	v['cshlib_PATTERN'] 	= 'lib%s.so'
 	v['cxxshlib_PATTERN'] 	= 'lib%s.so'
 	v['cstlib_PATTERN']     = 'lib%s.a'
 	v['cxxstlib_PATTERN']   = 'lib%s.a'
-	
+
 	v['DEFINES'] += ['_LINUX', 'LINUX', 'LINUX32', 'ANDROID', '_HAS_C9X' ]
 
 	# Setup global include paths
-	v['INCLUDES'] += [ 
-		android_ndk_platform_compiler_target + '/usr/include', 
-		android_stl_home + '/include', 
-		android_stl_home + '/libs/armeabi-v7a/include',
-		android_ndk_home + '/sources/android/support/include',
-		android_ndk_home + '/sources/android/native_app_glue',
-		conf.CreateRootRelativePath('Code/Tools/SDLExtension/src/include'),
-		]
-	
+	v['INCLUDES'] += [
+	    f'{android_ndk_platform_compiler_target}/usr/include',
+	    f'{android_stl_home}/include',
+	    f'{android_stl_home}/libs/armeabi-v7a/include',
+	    f'{android_ndk_home}/sources/android/support/include',
+	    f'{android_ndk_home}/sources/android/native_app_glue',
+	    conf.CreateRootRelativePath('Code/Tools/SDLExtension/src/include'),
+	]
+
 	# Setup global library search path
-	v['LIBPATH'] += [		
-		android_stl_home + 'libs/armeabi-v7a',
-		platform_target + '/usr/lib'
-	]	 
+	v['LIBPATH'] += [
+	    f'{android_stl_home}libs/armeabi-v7a',
+	    f'{platform_target}/usr/lib',
+	]
 	# Introduce the compiler to generate 32 bit code
 	v['CFLAGS'] += [ '-mfpu=neon', '-mfloat-abi=softfp', '-march=armv7-a', '-fno-inline' ]
 	v['CXXFLAGS'] += [ '-mfpu=neon', '-mfloat-abi=softfp', '-march=armv7-a', '-fno-inline' ]	
-	
-	v['CFLAGS'] += [ '--sysroot=' + android_ndk_platform_compiler_target ]
-	v['CXXFLAGS'] += [ '--sysroot=' + android_ndk_platform_compiler_target ]
-	v['LINKFLAGS'] += [ '--sysroot=' + android_ndk_platform_compiler_target, android_stl_home + '/libs/armeabi-v7a/libgnustl_shared.so']
+
+	v['CFLAGS'] += [f'--sysroot={android_ndk_platform_compiler_target}']
+	v['CXXFLAGS'] += [f'--sysroot={android_ndk_platform_compiler_target}']
+	v['LINKFLAGS'] += [
+	    f'--sysroot={android_ndk_platform_compiler_target}',
+	    f'{android_stl_home}/libs/armeabi-v7a/libgnustl_shared.so',
+	]
 	
 @conf
 def load_debug_win_x64_android_arm_gcc_settings(conf):
@@ -402,16 +411,16 @@ import shutil
 @feature('android_launcher')
 def process_android_java_files(self):
 
-	if not 'android' in self.bld.cmd or self.bld.cmd == "msvs":
+	if 'android' not in self.bld.cmd or self.bld.cmd == "msvs":
 		return 
-	
+
 	bld = self.bld
 	platform	= bld.env['PLATFORM']
 	configuration	= bld.env['CONFIGURATION']
 	bin_temp_path = bld.bldnode.make_node('BinTemp')
 	final_bin_outpath = bld.get_output_folders(platform, configuration)[0]
 	apk_folder = bin_temp_path.make_node('apk_data')
-	
+
 	try:
 		# TO DO: OPTIMIZE
 		# Clear everything as everything in this folder contributes to the apk file. Ensure we are not using left over stuff.
@@ -420,12 +429,12 @@ def process_android_java_files(self):
 		pass
 	finally:
 		apk_folder.mkdir()
-	
+
 	# Output folders
 	javac_output_path = bin_temp_path.make_node('javac_output')
 	javac_target_output_path = javac_output_path.make_node(self.target)
-	jar_file_path = javac_output_path.make_node(self.target + '.jar')
-	
+	jar_file_path = javac_output_path.make_node(f'{self.target}.jar')
+
 	try:
 		# TO DO: OPTIMIZE
 		# Clear everything as everything in this folder contributes to the jar file. Ensure we are not using left over .class files etc. 
@@ -434,40 +443,40 @@ def process_android_java_files(self):
 		pass
 	finally:
 		javac_output_path.mkdir()
-	
+
 	# Ensure JAVA_HOME is set to the correct directory otherwise Ant may force JAVA_HOME to the Java Runtime Environment  directory 
 	# which does not have a tools packed with it that are required
 	os.environ['JAVA_HOME'] = str(self.env['ANDROID_JAVA_HOME'])
-	
+
 	# Java compile
 	self.java_source = self.to_nodes(getattr(self, 'java_source', []))
 	self.javac_task = self.create_task('javac', self.java_source)
 	self.javac_task.output_dir = self.output_dir = javac_target_output_path
 	self.javac_task.output_dir.mkdir()  
-	
+
 	# Java archive
 	self.jar_task = self.create_task('jar_create', None, jar_file_path)
 	self.jar_task.basedir = self.javac_task.output_dir
-	self.jar_task.env['JAROPTS'] = [ javac_target_output_path.abspath() + '\\*']	
+	self.jar_task.env['JAROPTS'] = [ javac_target_output_path.abspath() + '\\*']
 	self.jar_task.env['JARROOT'] = javac_target_output_path.abspath()
 	self.jar_task.set_run_after(self.javac_task)
 	self.javac_task.dependent_task = [self.jar_task]
-  
+
 	# Copy .jar file to apk_date folder
 	lib_path = apk_folder.make_node('libs')
-	jar_final_path = lib_path.make_node(self.target + '.jar')	
-	copy_libs_task = self.create_task('copy_outputs', jar_file_path, jar_final_path ) 
+	jar_final_path = lib_path.make_node(f'{self.target}.jar')
+	copy_libs_task = self.create_task('copy_outputs', jar_file_path, jar_final_path )
 	lib_path.mkdir()
-		
+
 	# Create resource (AndroidManifest)
 	template = compile_template(APP_MANIFEST_STRING_TEMPLATE)
 	string_xml_data = {'app_name' : android_app_name }
 	string_xml_dir = apk_folder.make_node('res/values')
 	string_xml_node = string_xml_dir.make_node('string.xml')
-	string_xml_task = self.create_task('generate_file', None, string_xml_node)	
+	string_xml_task = self.create_task('generate_file', None, string_xml_node)
 	string_xml_task.file_content = template(string_xml_data)
 	string_xml_dir.mkdir()
-	
+
 	# Create android manifest	
 	template = compile_template(APP_MANIFEST_TEMPLATE)
 	app_manifest_xml_data = { 'package' 				:	android_package_name,
@@ -479,42 +488,43 @@ def process_android_java_files(self):
 	app_manifest_xml_node = apk_folder.make_node('AndroidManifest.xml')
 	app_manifest_xml_task = self.create_task('generate_file', None, app_manifest_xml_node)
 	app_manifest_xml_task.file_content =  template(app_manifest_xml_data)
-	
+
 	# Generate gdb.setup file (GDB)
 	gdb_setup_node = final_bin_outpath.make_node('gdb.setup')
 	gdb_setup_task = self.create_task('generate_file', None, gdb_setup_node)
 	gdb_setup_task.file_content = 'set solib-search-path ' + final_bin_outpath.make_node('lib_debug/armeabi-v7a').abspath().replace('\\', '/')
-	
+
 	# Create build.xml (ANT)
 	build_xml_node = apk_folder.make_node('build.xml')
 	build_xml_task = self.create_task('generate_file', None, build_xml_node)
 	build_xml_task.file_content =  ANT_BUILD_TEMPLATE
-	
+
 	# Create build.properties (ANT)
 	build_properties_node = apk_folder.make_node('build.properties')
 	build_properties_task = self.create_task('create_ant_properties', None, build_properties_node)
-	
+
 	# Clean ant task
 	inputs = [jar_final_path, build_xml_node, string_xml_node, app_manifest_xml_node, build_properties_node]
 	self.ant_clean_task = self.create_task('execute_ant', inputs, None)
 	self.ant_clean_task.output_dir = apk_folder
 	self.ant_clean_task.command = 'clean'
-	
+
 	# Build ant task
-	ant_apk_node = apk_folder.make_node('bin').make_node(self.target + '-debug.apk')
+	ant_apk_node = apk_folder.make_node('bin').make_node(
+	    f'{self.target}-debug.apk')
 	self.ant_build_task = self.create_task('execute_ant', None, ant_apk_node)
 	self.ant_build_task.output_dir = apk_folder
 	self.ant_build_task.command = 'debug'
 	self.ant_build_task.set_run_after(self.ant_clean_task)
-	
+
 	apk_folder.make_node('src').mkdir()
 	apk_folder.make_node('gen').mkdir()
 	apk_folder.make_node('bin').mkdir()
 	apk_folder.make_node('build').mkdir()	
-	
+
 	# Copy .apk file to output folder
 	#ant_apk_node = apk_folder.make_node('bin').make_node(self.target + '-debug.apk') #  NOTE THIS IS DEBUG!!! need to handle profile/compile, too
-	final_apk_output_path = final_bin_outpath.make_node(self.target +'.apk')
+	final_apk_output_path = final_bin_outpath.make_node(f'{self.target}.apk')
 	copy_libs_task = self.create_task('copy_outputs', ant_apk_node, final_apk_output_path )
 	copy_libs_task.set_run_after(self.ant_build_task)
 	
@@ -537,21 +547,21 @@ class javac(Task.Task):
 		return (self.generator.bld.node_deps.get(self.uid(), []), [])		
 		
 	def run(self):
-		
+
 		""" Execute the javac compiler """
 		env = self.env
 		gen = self.generator
 		bld = gen.bld
 
-		cmd = []	
-		cmd += [ env['JAVAC'] ]		
+		cmd = []
+		cmd += [ env['JAVAC'] ]
 		cmd += [ '-classpath', env['ANDROID_CLASSPATH'] ]
 		cmd += [ '-d', self.output_dir.abspath() ]
 		cmd += [ '-Xlint:deprecation' ]
-		
+
 		#files = [a.path_from(bld.bldnode) for a in self.inputs]
 		files = [a.path_from(self.output_dir) for a in self.inputs]
-		
+
 		# workaround for command line length limit:
 		# http://support.microsoft.com/kb/830473
 		tmp = None
@@ -565,7 +575,7 @@ class javac(Task.Task):
 						os.close(fd)
 				if Logs.verbose:
 					Logs.debug('runner: %r' % (cmd + files))
-				cmd.append('@' + tmp)
+				cmd.append(f'@{tmp}')
 			else:
 				cmd += files
 
@@ -654,23 +664,22 @@ class strip_shared_lib(Task.Task):
 		return super(strip_shared_lib, self).runnable_status()
 		
 	def run(self):
-		
+
 		""" Execute the javac compiler """
 		env = self.env
 		gen = self.generator
 		bld = gen.bld
-		
+
 		src = self.inputs[0].abspath()
 		tgt = self.outputs[0].abspath()
 
-		cmd = []	
-		cmd += [ env['STRIP'] ]		
+		cmd = []
+		cmd += [ env['STRIP'] ]
 		cmd += [ src ]
 		cmd += [ '--strip-debug' ]
 		cmd += [ '-o', tgt ]
 
-		ret = self.exec_command(cmd, env=env.env or None)
-		return ret
+		return self.exec_command(cmd, env=env.env or None)
 
 		
 ###############################################################################
@@ -679,23 +688,23 @@ class strip_shared_lib(Task.Task):
 @after_method('process_android_java_files')
 @feature('c', 'cxx')
 def add_android_lib_copy(self):
-	if not 'android' in self.bld.cmd or self.bld.cmd == "msvs":
+	if 'android' not in self.bld.cmd or self.bld.cmd == "msvs":
 		return 
-				
+
 	if not getattr(self, 'link_task', None):
 		return
 
 	if self._type == 'stlib': # Do not copy static libs
 		return		
-		
+
 	bld = self.bld
 	platform	= bld.env['PLATFORM']
 	configuration	= bld.env['CONFIGURATION']
 	bin_temp_path = bld.bldnode.make_node('BinTemp')
 	apk_folder = bin_temp_path.make_node('apk_data')
-	
+
 	apk_lib_folder = apk_folder.make_node('lib')
-			
+
 	# Add external libs
 	android_shared_libs     = { 'armeabi-v7a': [
 															bld.env['ANDROID_SDL_HOME'] + '/libs/armeabi-v7a/libgnustl_shared.so',
@@ -706,29 +715,29 @@ def add_android_lib_copy(self):
 														}
 
 	# Add internal libs
-	if not 'armeabi-v7a' in android_shared_libs:
-		android_shared_libs['armeabi-v7a'] = []	
+	if 'armeabi-v7a' not in android_shared_libs:
+		android_shared_libs['armeabi-v7a'] = []
 	for src in self.link_task.outputs:
 		android_shared_libs['armeabi-v7a'].append(src.abspath())		
-	
+
 	# Original shared lib output path (not stripped)(for debugger)
 	debug_lib_output = bld.get_output_folders(platform, configuration)[0].make_node('lib_debug')
 	debug_lib_output.mkdir()
-	
+
 	for lib_dir, shared_libs in android_shared_libs.iteritems():
 		tgt_dir = apk_lib_folder.make_node(lib_dir)
 		tgt_dir.mkdir()
-		
+
 		tgt_debug = debug_lib_output.make_node(lib_dir)
 		tgt_debug.mkdir()
-				
+
 		for shared_lib in shared_libs:
 			shared_lib_basename = os.path.basename(shared_lib)
 			src = bld.root.make_node(shared_lib)
-			
+
 			# Copy original to debug lib dir (for debugger)
 			self.create_task('copy_outputs', src, tgt_debug.make_node(shared_lib_basename))
-		
+
 			# Strip lib and add to apk directory
 			tgt_stripped = tgt_dir.make_node(shared_lib_basename)
 			task = self.create_task('strip_shared_lib',src, tgt_stripped)
@@ -792,20 +801,21 @@ class create_ant_properties(Task.Task):
 	    		
 		return super(create_ant_properties, self).runnable_status()
 		
-	def run(self):		
+	def run(self):
 		""" Execute the javac compiler """
 		env = self.env
-		output_str = []
-		output_str.append('# This file is automatically generated by Android Tools.')
-		output_str.append('# Do not modify this file -- YOUR CHANGES WILL BE ERASED!')
-		output_str.append('')
-		output_str.append('target=android-%s' % str(env['ANDROID_TARGET_VERSION']))
-		output_str.append('')
-		output_str.append('gen.absolute.dir=./gen')
-		output_str.append('out.dir=./bin')
-		output_str.append('jar.libs.dir=./libs')
-		output_str.append('native.libs.absolute.dir=./lib')		
-		output_str.append('sdk.dir=%s' % str(env['ANDROID_SDK_HOME']).replace('\\','/'))
+		output_str = [
+		    '# This file is automatically generated by Android Tools.',
+		    '# Do not modify this file -- YOUR CHANGES WILL BE ERASED!',
+		    '',
+		    f"target=android-{str(env['ANDROID_TARGET_VERSION'])}",
+		    '',
+		    'gen.absolute.dir=./gen',
+		    'out.dir=./bin',
+		    'jar.libs.dir=./libs',
+		    'native.libs.absolute.dir=./lib',
+		    'sdk.dir=%s' % str(env['ANDROID_SDK_HOME']).replace('\\', '/'),
+		]
 		self.outputs[0].stealth_write('\n'.join(output_str))
 		return 0
 
@@ -820,24 +830,21 @@ class execute_ant(Task.Task):
 		files to update the list of inputs.
 		"""
 		
-		for t in self.run_after:
-			if not t.hasrun:
-				return Task.ASK_LATER
-
-		return Task.RUN_ME
+		return next((Task.ASK_LATER for t in self.run_after if not t.hasrun),
+		            Task.RUN_ME)
 		
 	def run(self):
-		
+
 		""" Run Ant """
 		env = self.env
 		gen = self.generator
 
-		cmd = []	
-		cmd += [ env['ANT'] ]		
+		cmd = []
+		cmd += [ env['ANT'] ]
 		cmd += [ self.command ]
-		
-		ret = self.exec_command(cmd, cwd=self.output_dir.abspath(), env=env.env or None)
-		return ret
+
+		return self.exec_command(
+		    cmd, cwd=self.output_dir.abspath(), env=env.env or None)
 		
 ###############################################################################
 # Function to generate the copy tasks for build outputs	
@@ -848,23 +855,25 @@ def force_add_dependent_android_files(self):
 
 	# ANDROID HACK
 	# Add android dependent files from none src or build folder to build pipeline
-	
-	if not 'android' in self.bld.cmd or self.bld.cmd == "msvs":
+
+	if 'android' not in self.bld.cmd or self.bld.cmd == "msvs":
 		return 
-		
+
 	bld = self.bld
 	env = bld.env
-		
+
 	special_sources = []
-	android_sdl_home = self.bld.env['ANDROID_SDL_HOME']
-	if android_sdl_home:
+	if android_sdl_home := self.bld.env['ANDROID_SDL_HOME']:
 		special_sources += [ bld.root.make_node(bld.CreateRootRelativePath('/Code/Tools/SDLExtension/src/jni/SDLExt_android.c')) ]
 		special_sources += [ bld.root.make_node(bld.CreateRootRelativePath('/Code/Tools/SDLExtension/src/jni/SDLExt_android_init.c')) ]
 
-	android_ndk_home = bld.env['ANDROID_NDK_HOME']
-	if android_ndk_home:
-		special_sources += [ bld.root.make_node(android_ndk_home + '/sources/android/native_app_glue/android_native_app_glue.c') ]
-		
+	if android_ndk_home := bld.env['ANDROID_NDK_HOME']:
+		special_sources += [
+		    bld.root.make_node(
+		        f'{android_ndk_home}/sources/android/native_app_glue/android_native_app_glue.c'
+		    )
+		]
+
 	# Create compile tasks
 	self.source +=  special_sources
 	for node in special_sources: 

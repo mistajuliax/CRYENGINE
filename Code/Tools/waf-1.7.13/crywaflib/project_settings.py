@@ -33,12 +33,12 @@ def _project_setting_entry(ctx, project, entry):
 	"""
 	_load_project_settings_file(ctx)
 
-	if not project in ctx.projects_settings:
+	if project not in ctx.projects_settings:
 		ctx.cry_file_error('Cannot find project entry for "%s"' % project, _projects_node(ctx).abspath() )
 
-	if not entry in ctx.projects_settings[project]:
+	if entry not in ctx.projects_settings[project]:
 		ctx.cry_file_error('Cannot find entry "%s" for project "%s"' % (entry, project), _projects_node(ctx).abspath())		
-		
+
 	return ctx.projects_settings[project][entry]
 
 	
@@ -48,8 +48,8 @@ def _project_durango_setting_entry(ctx, project, entry):
 	"""
 	
 	durango_settings = _project_setting_entry(ctx,project, 'durango_settings')
-	
-	if not entry in durango_settings:
+
+	if entry not in durango_settings:
 		ctx.cry_file_error('Cannot find entry "%s" for project "%s"' % (entry, project), _projects_node(ctx).abspath())		
 
 	return durango_settings[entry]
@@ -60,28 +60,24 @@ def _project_orbis_setting_entry(ctx, project, entry):
 	"""
 	
 	orbis_settings = _project_setting_entry(ctx,project, 'orbis_settings')
-	
-	if not entry in orbis_settings:
+
+	if entry not in orbis_settings:
 		ctx.cry_file_error('Cannot find entry "%s" for project "%s"' % (entry, project), _projects_node(ctx).abspath())		
 
 	return orbis_settings[entry]
 
 #############################################################################
 #############################################################################	
-@conf		
+@conf
 def game_projects(self):
 	_load_project_settings_file(self)
 
-	# Build list of game code folders
-	projects = []
-	for key, value in self.projects_settings.items():
-		projects += [ key ]
-	return projects
+	return [key for key, value in self.projects_settings.items()]
 	
 @conf	
 def project_idx	(self, project):
 	_load_project_settings_file(self)	
-	
+
 	nIdx = 0
 	for key, value in self.projects_settings.items():
 		if key == project:
@@ -120,7 +116,7 @@ def get_dedicated_server_product_name(self, game_project):
 #############################################################################	
 @conf
 def get_product_name(self, target, game_project):		
-	if target == 'WindowsLauncher' or target == 'OrbisLauncher' or target == 'DurangoLauncher':
+	if target in ['WindowsLauncher', 'OrbisLauncher', 'DurangoLauncher']:
 		return self.get_launcher_product_name(game_project)
 	elif target == 'DedicatedLauncher':
 		return self.get_dedicated_server_product_name(game_project)

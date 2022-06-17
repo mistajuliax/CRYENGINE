@@ -26,13 +26,14 @@ You would have to run::
 [1] http://www.jython.org/
 """
 
+
 import os, re, tempfile, shutil
 from waflib import TaskGen, Task, Utils, Options, Build, Errors, Node, Logs
 from waflib.Configure import conf
 from waflib.TaskGen import feature, before_method, after_method
 
 from waflib.Tools import ccroot
-ccroot.USELIB_VARS['javac'] = set(['CLASSPATH', 'JAVACFLAGS'])
+ccroot.USELIB_VARS['javac'] = {'CLASSPATH', 'JAVACFLAGS'}
 
 
 SOURCE_RE = '**/*.java'
@@ -93,7 +94,7 @@ def apply_java(self):
 		else:
 			y = self.path.find_dir(x)
 			if not y:
-				self.bld.fatal('Could not find the folder %s from %s' % (x, self.path))
+				self.bld.fatal(f'Could not find the folder {x} from {self.path}')
 		tmp.append(y)
 	tsk.srcdir = tmp
 
@@ -178,9 +179,7 @@ def jar_files(self):
 	tsk.basedir = basedir
 
 	jaropts.append('-C')
-	jaropts.append(basedir.bldpath())
-	jaropts.append('.')
-
+	jaropts.extend((basedir.bldpath(), '.'))
 	tsk.env['JAROPTS'] = jaropts
 	tsk.env['JARCREATE'] = jarcreate
 
@@ -270,8 +269,7 @@ class javac(Task.Task):
 		bld = gen.bld
 		wd = bld.bldnode.abspath()
 		def to_list(xx):
-			if isinstance(xx, str): return [xx]
-			return xx
+			return [xx] if isinstance(xx, str) else xx
 		cmd = []
 		cmd.extend(to_list(env['JAVAC']))
 		cmd.extend(['-classpath'])
@@ -345,9 +343,7 @@ class javadoc(Task.Task):
 		self.last_cmd = lst = []
 		lst.extend(Utils.to_list(env['JAVADOC']))
 		lst.extend(['-d', self.generator.javadoc_output.abspath()])
-		lst.extend(['-sourcepath', srcpath])
-		lst.extend(['-classpath', classpath])
-		lst.extend(['-subpackages'])
+		lst.extend(['-sourcepath', srcpath, '-classpath', classpath, '-subpackages'])
 		lst.extend(self.generator.javadoc_package)
 		lst = [x for x in lst if x]
 
@@ -416,7 +412,7 @@ def check_java_class(self, classname, with_classpath=None):
 	self.to_log("%s\n" % str(cmd))
 	found = self.exec_command(cmd, shell=False)
 
-	self.msg('Checking for java class %s' % classname, not found)
+	self.msg(f'Checking for java class {classname}', not found)
 
 	shutil.rmtree(javatestdir, True)
 
@@ -447,9 +443,9 @@ def check_jni_headers(conf):
 	# jni requires the jvm
 	javaHome = conf.env['JAVA_HOME'][0]
 
-	dir = conf.root.find_dir(conf.env.JAVA_HOME[0] + '/include')
+	dir = conf.root.find_dir(f'{conf.env.JAVA_HOME[0]}/include')
 	if dir is None:
-		dir = conf.root.find_dir(conf.env.JAVA_HOME[0] + '/../Headers') # think different?!
+		dir = conf.root.find_dir(f'{conf.env.JAVA_HOME[0]}/../Headers')
 	if dir is None:
 		conf.fatal('JAVA_HOME does not seem to be set properly')
 
@@ -460,10 +456,7 @@ def check_jni_headers(conf):
 	f = dir.ant_glob('**/*jvm.(so|dll|dylib)')
 	libDirs = [x.parent.abspath() for x in f] or [javaHome]
 
-	# On windows, we need both the .dll and .lib to link.  On my JDK, they are
-	# in different directories...
-	f = dir.ant_glob('**/*jvm.(lib)')
-	if f:
+	if f := dir.ant_glob('**/*jvm.(lib)'):
 		libDirs = [[x, y.parent.abspath()] for x in libDirs for y in f]
 
 	for d in libDirs:

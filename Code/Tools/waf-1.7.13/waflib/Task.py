@@ -79,9 +79,8 @@ def cache_outputs(cls):
 	m1 = cls.run
 	def run(self):
 		bld = self.generator.bld
-		if bld.cache_global and not bld.nocache:
-			if self.can_retrieve_cache():
-				return 0
+		if bld.cache_global and not bld.nocache and self.can_retrieve_cache():
+			return 0
 		return m1(self)
 	cls.run = run
 
@@ -107,32 +106,31 @@ class store_task_type(type):
 	The attribute 'run_str' will be processed to compute a method 'run' on the task class
 	The decorator :py:func:`waflib.Task.cache_outputs` is also applied to the class
 	"""
-	def __init__(cls, name, bases, dict):
-		super(store_task_type, cls).__init__(name, bases, dict)
-		name = cls.__name__
+	def __init__(self, name, bases, dict):
+		super(store_task_type, self).__init__(name, bases, dict)
+		name = self.__name__
 
 		if name.endswith('_task'):
 			name = name.replace('_task', '')
-		if name != 'evil' and name != 'TaskBase':
+		if name not in ['evil', 'TaskBase']:
 			global classes
 
-			if getattr(cls, 'run_str', None):
+			if getattr(self, 'run_str', None):
 				# if a string is provided, convert it to a method
-				(f, dvars) = compile_fun(cls.run_str, cls.shell)
-				cls.hcode = cls.run_str
-				cls.run_str = None
-				cls.run = f
-				cls.vars = list(set(cls.vars + dvars))
-				cls.vars.sort()
-			elif getattr(cls, 'run', None) and not 'hcode' in cls.__dict__:
+				(f, dvars) = compile_fun(self.run_str, self.shell)
+				self.hcode = self.run_str
+				self.run_str = None
+				self.run = f
+				self.vars = sorted(set(self.vars + dvars))
+			elif getattr(self, 'run', None) and 'hcode' not in self.__dict__:
 				# getattr(cls, 'hcode') would look in the upper classes
-				cls.hcode = Utils.h_fun(cls.run)
+				self.hcode = Utils.h_fun(self.run)
 
-			if not getattr(cls, 'nocache', None):
-				cls = cache_outputs(cls)
+			if not getattr(self, 'nocache', None):
+				self = cache_outputs(self)
 
 			# be creative
-			getattr(cls, 'register', classes)[name] = cls
+			getattr(self, 'register', classes)[name] = self
 
 evil = store_task_type('evil', (object,), {})
 "Base class provided to avoid writing a metaclass, so the code can run in python 2.6 and 3.x unmodified"
@@ -182,7 +180,11 @@ class TaskBase(evil):
 
 	def __repr__(self):
 		"for debugging purposes"
-		return '\n\t{task %r: %s %s}' % (self.__class__.__name__, id(self), str(getattr(self, 'fun', '')))
+		return '\n\t{task %r: %s %s}' % (
+		    self.__class__.__name__,
+		    id(self),
+		    getattr(self, 'fun', ''),
+		)
 
 	def __str__(self):
 		"string to display to the user"
@@ -273,9 +275,7 @@ class TaskBase(evil):
 
 		:rtype: int
 		"""
-		if hasattr(self, 'fun'):
-			return self.fun(self)
-		return 0
+		return self.fun(self) if hasattr(self, 'fun') else 0
 
 	def post_run(self):
 		"Update the cache files (executed by threads). Override in subclasses."
@@ -347,8 +347,7 @@ class TaskBase(evil):
 		"""
 		cls = self.__class__
 		tup = (str(cls.before), str(cls.after), str(cls.ext_in), str(cls.ext_out), cls.__name__, cls.hcode)
-		h = hash(tup)
-		return h
+		return hash(tup)
 
 	def format_error(self):
 		"""
@@ -358,10 +357,8 @@ class TaskBase(evil):
 		"""
 		msg = getattr(self, 'last_cmd', '')
 		# Format msg to be better read-able
-		output = ''
-		for i in msg:
-			output += i + ' '
-		msg = output[:len(output)-1]
+		output = ''.join(f'{i} ' for i in msg)
+		msg = output[:-1]
 		name = self.__class__.__name__.replace('_task', '') + ' (' + self.env['PLATFORM'] + '|' + self.env['CONFIGURATION'] + ')'
 		if getattr(self, "err_msg", None):
 			return self.err_msg
@@ -387,20 +384,16 @@ class TaskBase(evil):
 		then the result will be ['-a', '-b', '1', '-a', '-b', '2']
 		"""
 		tmp = self.env[var1]
-		if isinstance(var2, str):
-			it = self.env[var2]
-		else:
-			it = var2
+		it = self.env[var2] if isinstance(var2, str) else var2
 		if isinstance(tmp, str):
 			return [tmp % x for x in it]
-		else:
-			if Logs.verbose and not tmp and it:
-				Logs.warn('Missing env variable %r for task %r (generator %r)' % (var1, self, self.generator))
-			lst = []
-			for y in it:
-				lst.extend(tmp)
-				lst.append(y)
-			return lst
+		if Logs.verbose and not tmp and it:
+			Logs.warn('Missing env variable %r for task %r (generator %r)' % (var1, self, self.generator))
+		lst = []
+		for y in it:
+			lst.extend(tmp)
+			lst.append(y)
+		return lst
 
 class Task(TaskBase):
 	"""
@@ -441,8 +434,7 @@ class Task(TaskBase):
 		env = self.env
 		src_str = ' '.join([a.nice_path() for a in self.inputs])
 		tgt_str = ' '.join([a.nice_path() for a in self.outputs])
-		if self.outputs and self.inputs: sep = ' -> '
-		else: sep = ''
+		sep = ' -> ' if self.outputs and self.inputs else ''
 		name = self.__class__.__name__.replace('_task', '') + ' (' + env['PLATFORM'] + '|' + env['CONFIGURATION'] + ')'
 		return '%s: %s%s%s\n' % (name, src_str, sep, tgt_str)
 
@@ -673,9 +665,7 @@ class Task(TaskBase):
 		act_sig = bld.hash_env_vars(env, self.__class__.vars)
 		upd(act_sig)
 
-		# additional variable dependencies, if provided
-		dep_vars = getattr(self, 'dep_vars', None)
-		if dep_vars:
+		if dep_vars := getattr(self, 'dep_vars', None):
 			upd(bld.hash_env_vars(env, dep_vars))
 
 		return self.m.digest()
@@ -713,10 +703,7 @@ class Task(TaskBase):
 
 		# get the task signatures from previous runs
 		key = self.uid()
-		prev = bld.task_sigs.get((key, 'imp'), [])
-
-		# for issue #379
-		if prev:
+		if prev := bld.task_sigs.get((key, 'imp'), []):
 			try:
 				if prev == self.compute_sig_implicit_deps():
 					return prev
@@ -739,7 +726,7 @@ class Task(TaskBase):
 		# no previous run or the signature of the dependencies has changed, rescan the dependencies
 		(nodes, names) = self.scan()
 		if Logs.verbose:
-			Logs.debug('deps: scanner for %s returned %s %s' % (str(self), str(nodes), str(names)))
+			Logs.debug(f'deps: scanner for {str(self)} returned {str(nodes)} {str(names)}')
 
 		# store the dependencies in the cache
 		bld.node_deps[key] = nodes
@@ -783,7 +770,7 @@ class Task(TaskBase):
 			upd(k.get_bld_sig(self.generator))
 		#if not bld.node_deps.get(self.uid(), None) and 'qt' in self.generator: # No implicity dependencies, manually run QT dep checking
 		#	self.generator.parse_for_moccing_files(self)
-			
+
 		return self.m.digest()
 
 	def are_implicit_nodes_ready(self):
@@ -1143,10 +1130,7 @@ def compile_fun(line, shell=False):
 	if line.find('<') > 0 or line.find('>') > 0 or line.find('&&') > 0:
 		shell = True
 
-	if shell:
-		return compile_fun_shell(line)
-	else:
-		return compile_fun_noshell(line)
+	return compile_fun_shell(line) if shell else compile_fun_noshell(line)
 
 def task_factory(name, func=None, vars=None, color='GREEN', ext_in=[], ext_out=[], before=[], after=[], shell=False, scan=None):
 	"""
@@ -1238,15 +1222,12 @@ def update_outputs(cls):
 			bld = self.generator.bld
 			prev_sig = bld.task_sigs[self.uid()]
 			if prev_sig == self.signature():
-				for x in self.outputs:
-					if not x.sig or bld.task_sigs[x.abspath()] != self.uid():
-						return RUN_ME
-				return SKIP_ME
-		except KeyError:
-			pass
-		except IndexError:
-			pass
-		except AttributeError:
+				return next(
+				    (RUN_ME for x in self.outputs
+				     if not x.sig or bld.task_sigs[x.abspath()] != self.uid()),
+				    SKIP_ME,
+				)
+		except (KeyError, IndexError, AttributeError):
 			pass
 		return RUN_ME
 	cls.runnable_status = runnable_status

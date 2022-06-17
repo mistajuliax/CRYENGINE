@@ -73,7 +73,7 @@ def split_path(path):
 def split_path_cygwin(path):
 	if path.startswith('//'):
 		ret = path.split('/')[2:]
-		ret[0] = '/' + ret[0]
+		ret[0] = f'/{ret[0]}'
 		return ret
 	return path.split('/')
 
@@ -237,7 +237,7 @@ class Node(object):
 				pass
 
 			if not os.path.isdir(self.abspath()):
-				raise Errors.WafError('Could not create the directory %s' % self.abspath())
+				raise Errors.WafError(f'Could not create the directory {self.abspath()}')
 
 			try:
 				self.children
@@ -384,8 +384,7 @@ class Node(object):
 			c1 = c1.parent
 			c2 = c2.parent
 
-		for i in range(up):
-			lst.append('..')
+		lst.extend('..' for _ in range(up))
 		lst.reverse()
 		return os.sep.join(lst) or '.'
 
@@ -406,13 +405,12 @@ class Node(object):
 				val = os.sep + self.name
 			else:
 				val = self.parent.abspath() + os.sep + self.name
+		elif not self.parent:
+			val = ''
+		elif not self.parent.name:
+			val = self.name + os.sep
 		else:
-			if not self.parent:
-				val = ''
-			elif not self.parent.name:
-				val = self.name + os.sep
-			else:
-				val = self.parent.abspath().rstrip(os.sep) + os.sep + self.name
+			val = self.parent.abspath().rstrip(os.sep) + os.sep + self.name
 
 		self.cache_abspath = val
 		return val
@@ -472,19 +470,19 @@ class Node(object):
 				node = self.make_node([name])
 
 				isdir = os.path.isdir(node.abspath())
-				if accepted:
-					if isdir:
-						if dir:
-							yield node
-					else:
-						if src:
-							yield node
-
+				if accepted and (isdir and dir or not isdir and src):
+					yield node
 				if getattr(node, 'cache_isdir', None) or isdir:
 					node.cache_isdir = True
 					if maxdepth:
-						for k in node.ant_iter(accept=accept, maxdepth=maxdepth - 1, pats=npats, dir=dir, src=src, remove=remove):
-							yield k
+						yield from node.ant_iter(
+						    accept=accept,
+						    maxdepth=maxdepth - 1,
+						    pats=npats,
+						    dir=dir,
+						    src=src,
+						    remove=remove,
+						)
 		raise StopIteration
 
 	def ant_glob(self, *k, **kw):
@@ -544,12 +542,12 @@ class Node(object):
 						accu.append(k)
 					else:
 						k = k.replace('.', '[.]').replace('*','.*').replace('?', '.').replace('+', '\\+')
-						k = '^%s$' % k
+						k = f'^{k}$'
 						try:
 							#print "pattern", k
 							accu.append(re.compile(k, flags=reflags))
 						except Exception as e:
-							raise Errors.WafError("Invalid pattern: %s" % k, e)
+							raise Errors.WafError(f"Invalid pattern: {k}", e)
 				ret.append(accu)
 			return ret
 
@@ -684,9 +682,8 @@ class Node(object):
 		if not node:
 			self = self.get_src()
 			node = self.find_node(lst)
-		if node:
-			if os.path.isdir(node.abspath()):
-				return None
+		if node and os.path.isdir(node.abspath()):
+			return None
 		return node
 
 	def find_or_declare(self, lst):
@@ -747,10 +744,7 @@ class Node(object):
 		name = self.name
 		if ext_in is None:
 			k = name.rfind('.')
-			if k >= 0:
-				name = name[:k] + ext
-			else:
-				name = name + ext
+			name = name[:k] + ext if k >= 0 else name + ext
 		else:
 			name = name[:- len(ext_in)] + ext
 

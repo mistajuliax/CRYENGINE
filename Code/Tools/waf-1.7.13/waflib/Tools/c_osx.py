@@ -58,10 +58,7 @@ def create_bundle_dirs(self, name, out):
 def bundle_name_for_output(out):
 	name = out.name
 	k = name.rfind('.')
-	if k >= 0:
-		name = name[:k] + '.app'
-	else:
-		name = name + '.app'
+	name = f'{name[:k]}.app' if k >= 0 else f'{name}.app'
 	return name
 
 @feature('cprogram', 'cxxprogram')
@@ -79,39 +76,38 @@ def create_task_macapp(self):
 			bld.env.MACAPP = True
 			bld.shlib(source='a.c', target='foo')
 	"""
-	if self.env['MACAPP'] or getattr(self, 'mac_app', False):
-		out = self.link_task.outputs[0]
+	if not self.env['MACAPP'] and not getattr(self, 'mac_app', False):
+		return
+	out = self.link_task.outputs[0]
 
-		name = bundle_name_for_output(out)
-		dir = self.create_bundle_dirs(name, out)
+	name = bundle_name_for_output(out)
+	dir = self.create_bundle_dirs(name, out)
 
-		n1 = dir.find_or_declare(['Contents', 'MacOS', out.name])
+	n1 = dir.find_or_declare(['Contents', 'MacOS', out.name])
 
-		self.apptask = self.create_task('macapp', self.link_task.outputs, n1)
-		inst_to = getattr(self, 'install_path', '/Applications') + '/%s/Contents/MacOS/' % name
-		self.bld.install_files(inst_to, n1, chmod=Utils.O755)
+	self.apptask = self.create_task('macapp', self.link_task.outputs, n1)
+	inst_to = (getattr(self, 'install_path', '/Applications') +
+	           f'/{name}/Contents/MacOS/')
+	self.bld.install_files(inst_to, n1, chmod=Utils.O755)
 
-		if getattr(self, 'mac_resources', None):
-			res_dir = n1.parent.parent.make_node('Resources')
-			inst_to = getattr(self, 'install_path', '/Applications') + '/%s/Resources' % name
-			for x in self.to_list(self.mac_resources):
-				node = self.path.find_node(x)
-				if not node:
-					raise Errors.WafError('Missing mac_resource %r in %r' % (x, self))
+	if getattr(self, 'mac_resources', None):
+		res_dir = n1.parent.parent.make_node('Resources')
+		inst_to = getattr(self, 'install_path', '/Applications') + f'/{name}/Resources'
+		for x in self.to_list(self.mac_resources):
+			node = self.path.find_node(x)
+			if not node:
+				raise Errors.WafError('Missing mac_resource %r in %r' % (x, self))
 
-				parent = node.parent
-				if os.path.isdir(node.abspath()):
-					nodes = node.ant_glob('**')
-				else:
-					nodes = [node]
-				for node in nodes:
-					rel = node.path_from(parent)
-					tsk = self.create_task('macapp', node, res_dir.make_node(rel))
-					self.bld.install_as(inst_to + '/%s' % rel, node)
+			parent = node.parent
+			nodes = node.ant_glob('**') if os.path.isdir(node.abspath()) else [node]
+			for node in nodes:
+				rel = node.path_from(parent)
+				tsk = self.create_task('macapp', node, res_dir.make_node(rel))
+				self.bld.install_as(inst_to + f'/{rel}', node)
 
-		if getattr(self.bld, 'is_install', None):
-			# disable the normal binary installation
-			self.install_task.hasrun = Task.SKIP_ME
+	if getattr(self.bld, 'is_install', None):
+		# disable the normal binary installation
+		self.install_task.hasrun = Task.SKIP_ME
 
 @feature('cprogram', 'cxxprogram')
 @after_method('apply_link')
@@ -119,7 +115,7 @@ def create_task_macplist(self):
 	"""
 	Create a :py:class:`waflib.Tools.c_osx.macplist` instance.
 	"""
-	if  self.env['MACAPP'] or getattr(self, 'mac_app', False):
+	if self.env['MACAPP'] or getattr(self, 'mac_app', False):
 		out = self.link_task.outputs[0]
 
 		name = bundle_name_for_output(out)
@@ -129,15 +125,14 @@ def create_task_macplist(self):
 		self.plisttask = plisttask = self.create_task('macplist', [], n1)
 
 		if getattr(self, 'mac_plist', False):
-			node = self.path.find_resource(self.mac_plist)
-			if node:
+			if node := self.path.find_resource(self.mac_plist):
 				plisttask.inputs.append(node)
 			else:
 				plisttask.code = self.mac_plist
 		else:
 			plisttask.code = app_info % self.link_task.outputs[0].name
 
-		inst_to = getattr(self, 'install_path', '/Applications') + '/%s/Contents/' % name
+		inst_to = getattr(self, 'install_path', '/Applications') + f'/{name}/Contents/'
 		self.bld.install_files(inst_to, n1)
 
 @feature('cshlib', 'cxxshlib')
@@ -159,7 +154,7 @@ def apply_bundle(self):
 		self.env['LINKFLAGS_cshlib'] = self.env['LINKFLAGS_cxxshlib'] = [] # disable the '-dynamiclib' flag
 		self.env['cshlib_PATTERN'] = self.env['cxxshlib_PATTERN'] = self.env['macbundle_PATTERN']
 		use = self.use = self.to_list(getattr(self, 'use', []))
-		if not 'MACBUNDLE' in use:
+		if 'MACBUNDLE' not in use:
 			use.append('MACBUNDLE')
 
 app_dirs = ['Contents', 'Contents/MacOS', 'Contents/Resources']
@@ -180,9 +175,6 @@ class macplist(Task.Task):
 	color = 'PINK'
 	ext_in = ['.bin']
 	def run(self):
-		if getattr(self, 'code', None):
-			txt = self.code
-		else:
-			txt = self.inputs[0].read()
+		txt = self.code if getattr(self, 'code', None) else self.inputs[0].read()
 		self.outputs[0].write(txt)
 

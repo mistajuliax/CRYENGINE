@@ -90,7 +90,7 @@ def set_editor_flags(self, kw):
 	spec = self.options.project_spec
 	platform = self.env['PLATFORM']
 	configuration = self.GetConfiguration(kw['target'])
-	
+
 	if platform and (platform == 'project_generator' or self.cmd == 'generate_uber_files' or 'SandboxLegacy' in self.spec_modules(spec, platform, configuration)):
 		includes += [
 		self.CreateRootRelativePath('Code/Sandbox/Editor'),
@@ -110,10 +110,10 @@ def set_editor_flags(self, kw):
 		self.CreateRootRelativePath('Code/SDKs/yasli'),
 		self.CreateRootRelativePath('Code/Libs/yasli'),
 		] + kw['includes']
-	
+
 	if 'priority_includes' in kw:
 		kw['includes'] = kw['priority_includes'] + kw['includes']
-	
+
 	kw['defines'] += [
 		'WIN32',
 		'CRY_ENABLE_RC_HELPER',
@@ -121,7 +121,7 @@ def set_editor_flags(self, kw):
 		'IS_EDITOR_BUILD',
 		'QT_FORCE_ASSERT '
 		]
-	
+
 	kw['features'] += ['qt']
 	kw['use_module'] += [ 'yasli' ]
 	kw['module_extensions'] += [ 'python27' ]

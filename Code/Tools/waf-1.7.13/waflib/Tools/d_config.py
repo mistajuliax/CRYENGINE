@@ -17,15 +17,14 @@ def d_platform_flags(self):
 	if binfmt == 'pe':
 		v['dprogram_PATTERN'] = '%s.exe'
 		v['dshlib_PATTERN']   = 'lib%s.dll'
-		v['dstlib_PATTERN']   = 'lib%s.a'
 	elif binfmt == 'mac-o':
 		v['dprogram_PATTERN'] = '%s'
 		v['dshlib_PATTERN']   = 'lib%s.dylib'
-		v['dstlib_PATTERN']   = 'lib%s.a'
 	else:
 		v['dprogram_PATTERN'] = '%s'
 		v['dshlib_PATTERN']   = 'lib%s.so'
-		v['dstlib_PATTERN']   = 'lib%s.a'
+
+	v['dstlib_PATTERN']   = 'lib%s.a'
 
 DLIB = '''
 version(D_Version2) {
